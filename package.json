@@ -26,6 +26,7 @@
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
     "chunked-dc": "^0.1.1",
+    "saltyrtc-client": "^0.1.1",
     "webrtc-adapter": "^2.0.4"
   }
 }
