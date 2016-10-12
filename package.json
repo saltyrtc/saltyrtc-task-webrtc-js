@@ -1,0 +1,27 @@
+{
+  "name": "saltyrtc-task-webrtc",
+  "version": "0.1.0",
+  "description": "A SaltyRTC WebRTC task implementation.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saltyrtc/saltyrtc-task-webrtc-js.git"
+  },
+  "keywords": [
+    "saltyrtc",
+    "webrtc",
+    "data",
+    "channels",
+    "signaling",
+    "secure"
+  ],
+  "author": "Danilo Bargen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js/issues"
+  },
+  "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme"
+}
