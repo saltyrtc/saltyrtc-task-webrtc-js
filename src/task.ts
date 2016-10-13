@@ -24,7 +24,7 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import { EventRegistry } from "saltyrtc-client/saltyrtc/main";
+import {EventRegistry} from "saltyrtc-client/saltyrtc/main";
 
 export class WebRTCTask implements saltyrtc.Task {
 
