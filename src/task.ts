@@ -237,7 +237,7 @@ export class WebRTCTask implements saltyrtc.Task {
 
     public getData(): Object {
         const data = {};
-        data[WebRTCTask.FIELD_EXCLUDE] = this.exclude;
+        data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
         data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.maxPacketSize;
         return data;
     }
