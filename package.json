@@ -35,13 +35,13 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "chunked-dc": "^0.2.1",
-    "saltyrtc-client": "^0.1.8",
+    "chunked-dc": "^0.2.2",
+    "saltyrtc-client": "^0.2.0",
     "webrtc-adapter": "^2.0.4"
   },
   "devDependencies": {
-    "babel-plugin-external-helpers": "^6.8.0",
     "babel-es6-polyfill": "^1.1.0",
+    "babel-plugin-external-helpers": "^6.8.0",
     "babel-preset-es2015": "^6.16.0",
     "jasmine-core": "^2.5.0",
     "karma": "^1.2.0",

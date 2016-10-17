@@ -4,9 +4,10 @@ module.exports = function(config) {
         frameworks: ['jasmine'],
         files: [
             'node_modules/webrtc-adapter/out/adapter.js',
+            'node_modules/msgpack-lite/dist/msgpack.min.js',
+            'node_modules/tweetnacl/nacl-fast.js',
             'node_modules/saltyrtc-client/dist/saltyrtc-client.es5.js',
             'node_modules/chunked-dc/dist/chunked-dc.es5.js',
-            'node_modules/tweetnacl/nacl-fast.js',
             'tests/testsuite.js',
         ],
         customLaunchers: {

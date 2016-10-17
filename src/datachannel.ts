@@ -5,9 +5,8 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference path="types/RTCPeerConnection.d.ts" />
+/// <reference path='types/RTCPeerConnection.d.ts' />
 /// <reference path='types/tweetnacl.d.ts' />
-/// <reference path='types/saltyrtc.d.ts' />
 
 import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client";
 import {Chunker, Unchunker} from "chunked-dc";

@@ -5,7 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-import {Cookie} from "saltyrtc-client/saltyrtc/main";
+import {Cookie} from "saltyrtc-client";
 
 
 /**
