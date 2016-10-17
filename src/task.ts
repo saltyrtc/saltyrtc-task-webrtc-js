@@ -5,8 +5,8 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference path='../node_modules/saltyrtc-client/saltyrtc/saltyrtc.d.ts' />
-/// <reference path ='saltyrtc-task-webrtc.d.ts' />
+/// <reference path='types/saltyrtc.d.ts' />
+/// <reference path='saltyrtc-task-webrtc.d.ts' />
 
 /**
  * WebRTC Task.

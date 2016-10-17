@@ -6,11 +6,16 @@
  */
 
 /// <reference path="types/RTCPeerConnection.d.ts" />
+/// <reference path='types/tweetnacl.d.ts' />
+/// <reference path='types/saltyrtc.d.ts' />
 
-import {Chunker, Unchunker} from "chunked-dc/src/main";
-import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client/saltyrtc/main";
+import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client";
+import {Chunker, Unchunker} from "chunked-dc";
 import {WebRTCTask} from "./task";
 import {DataChannelNonce} from "./nonce";
+
+type EventHandler = (event: Event) => void;
+type MessageEventHandler = (event: RTCMessageEvent) => void;
 
 /**
  * Wrapper around a regular DataChannel.
@@ -24,7 +29,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
     // Wrapped data channel
     private dc: RTCDataChannel;
-    private _onmessage: saltyrtc.MessageEventHandler;
+    private _onmessage: (event: RTCMessageEvent) => void;
 
     // Task instance
     private task: WebRTCTask;
@@ -178,7 +183,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Validate nonce
         try {
-            this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce));
+            this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
         } catch (e) {
             console.error(this.logTag, 'Invalid nonce:', e);
             console.error(this.logTag, 'Closing data channel');
@@ -241,16 +246,16 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     set binaryType(value: RTCBinaryType) { this.dc.binaryType = value; }
 
     // Event handlers
-    get onopen(): saltyrtc.EventHandler { return this.dc.onopen; }
-    set onopen(value: saltyrtc.EventHandler) { this.dc.onopen = value; }
-    get onbufferedamountlow(): saltyrtc.EventHandler { return this.dc.onbufferedamountlow; }
-    set onbufferedamountlow(value: saltyrtc.EventHandler) { this.dc.onbufferedamountlow = value; }
-    get onerror(): saltyrtc.EventHandler { return this.dc.onerror; }
-    set onerror(value: saltyrtc.EventHandler) { this.dc.onerror = value; }
-    get onclose(): saltyrtc.EventHandler { return this.dc.onclose; }
-    set onclose(value: saltyrtc.EventHandler) { this.dc.onclose = value; }
-    get onmessage(): saltyrtc.MessageEventHandler { return this.dc.onmessage; }
-    set onmessage(value: saltyrtc.MessageEventHandler) { this._onmessage = value; }
+    get onopen(): EventHandler { return this.dc.onopen; }
+    set onopen(value: EventHandler) { this.dc.onopen = value; }
+    get onbufferedamountlow(): EventHandler { return this.dc.onbufferedamountlow; }
+    set onbufferedamountlow(value: EventHandler) { this.dc.onbufferedamountlow = value; }
+    get onerror(): EventHandler { return this.dc.onerror; }
+    set onerror(value: EventHandler) { this.dc.onerror = value; }
+    get onclose(): EventHandler { return this.dc.onclose; }
+    set onclose(value: EventHandler) { this.dc.onclose = value; }
+    get onmessage(): MessageEventHandler { return this.dc.onmessage; }
+    set onmessage(value: MessageEventHandler) { this._onmessage = value; }
 
     // Regular methods
     close(): void { this.dc.close(); }
