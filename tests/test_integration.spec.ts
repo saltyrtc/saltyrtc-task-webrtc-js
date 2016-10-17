@@ -70,6 +70,156 @@ export default () => { describe('Integration Tests', function() {
                 .asResponder() as saltyrtc.SaltyRTC;
         });
 
+        /**
+         * Do the initiator flow.
+         */
+        async function initiatorFlow(pc: RTCPeerConnection, task: WebRTCTask): Promise<void> {
+            // Send offer
+            let offer: RTCSessionDescriptionInit = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            console.debug('Initiator: Created offer, set local description');
+            task.sendOffer(offer);
+
+            // Receive answer
+            function receiveAnswer(): Promise<RTCSessionDescriptionInit> {
+                return new Promise((resolve) => {
+                    task.once('answer', (message: saltyrtc.messages.TaskMessage) => {
+                        resolve(message.data.answer);
+                    });
+                });
+            }
+            let answer: RTCSessionDescriptionInit = await receiveAnswer();
+            await pc.setRemoteDescription(answer)
+              .catch(error => console.error('Could not set remote description', error));
+            console.debug('Initiator: Received answer, set remote description');
+        }
+
+        /**
+         * Do the responder flow.
+         */
+        async function responderFlow(pc: RTCPeerConnection, task: WebRTCTask): Promise<void> {
+            // Receive offer
+            function receiveOffer(): Promise<RTCSessionDescriptionInit> {
+                return new Promise((resolve) => {
+                    task.once('offer', (message: saltyrtc.messages.TaskMessage) => {
+                        resolve(message.data.offer);
+                    });
+                });
+            }
+            let offer: RTCSessionDescriptionInit = await receiveOffer();
+            await pc.setRemoteDescription(offer)
+              .catch(error => console.error('Could not set remote description', error));
+            console.debug('Initiator: Received offer, set remote description');
+
+            // Send answer
+            let answer: RTCSessionDescriptionInit = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            console.debug('Initiator: Created answer, set local description');
+            task.sendAnswer(answer);
+        }
+
+        /**
+         * Set up transmission and processing of ICE candidates.
+         */
+        function setupIceCandidateHandling(pc: RTCPeerConnection, task: WebRTCTask) {
+            let role = task.getSignaling().role;
+            let logTag = role.charAt(0).toUpperCase() + role.slice(1) + ':';
+            console.debug(logTag, 'Setting up ICE candidate handling');
+            pc.onicecandidate = (e: RTCIceCandidateEvent) => {
+                if (e.candidate) {
+                    task.sendCandidates([{
+                        candidate: e.candidate.candidate,
+                        sdpMid: e.candidate.sdpMid,
+                        sdpMLineIndex: e.candidate.sdpMLineIndex,
+                    }]);
+                }
+            };
+            pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
+                console.error(logTag, 'ICE candidate error:', e);
+            };
+            task.on('candidates', (message: saltyrtc.messages.TaskMessage) => {
+                for (let candidateInit of message.data.candidates) {
+                    pc.addIceCandidate(candidateInit);
+                }
+            });
+            pc.oniceconnectionstatechange = (e: Event) => {
+                console.debug(logTag, 'ICE connection state changed to', pc.iceConnectionState);
+                console.debug(logTag, 'ICE gathering state changed to', pc.iceGatheringState);
+            }
+        }
+
+        /**
+         * Connect a peer.
+         */
+        function connect(salty: saltyrtc.SaltyRTC): Promise<{}> {
+            return new Promise((resolve) => {
+                salty.once('state-change:task', () => {
+                    resolve();
+                });
+                salty.connect();
+            });
+        }
+
+        /**
+         * Create two peer connections and do the handshake.
+         */
+        async function setupPeerConnection(): Promise<{initiator: RTCPeerConnection, responder: RTCPeerConnection}> {
+            // Create peer connections
+            const initiatorConn = new RTCPeerConnection();
+            const responderConn = new RTCPeerConnection();
+
+            // Connect both peers
+            const connectInitiator = connect(this.initiator);
+            const connectResponder = connect(this.responder);
+            await connectInitiator;
+            await connectResponder;
+
+            // Do initiator flow
+            initiatorConn.onnegotiationneeded = (e: Event) => {
+                initiatorFlow(initiatorConn, this.initiatorTask).then(
+                    (value) => console.debug('Initiator flow successful'),
+                    (error) => console.error('Initiator flow failed', error)
+                );
+            };
+
+            // Do responder flow
+            responderConn.onnegotiationneeded = (e: Event) => {
+                responderFlow(responderConn, this.responderTask).then(
+                    (value) => console.debug('Responder flow successful'),
+                    (error) => console.error('Responder flow failed', error)
+                );
+            };
+
+            // Set up ICE candidate handling
+            setupIceCandidateHandling(initiatorConn, this.initiatorTask);
+            setupIceCandidateHandling(responderConn, this.responderTask);
+
+            // Do handover
+            let handover = () => {
+                return new Promise((resolve) => {
+                    this.initiatorTask.handover(initiatorConn);
+                    this.responderTask.handover(responderConn);
+
+                    let handoverCount = 0;
+                    let handoverHandler = () => {
+                        handoverCount += 1;
+                        if (handoverCount == 2) {
+                            resolve();
+                        }
+                    };
+                    this.initiatorTask.once('handover', handoverHandler);
+                    this.responderTask.once('handover', handoverHandler);
+                });
+            };
+            await handover();
+            console.info('Handover done.');
+
+            return {
+                'initiator': initiatorConn,
+                'responder': responderConn,
+            }
+        }
+
         it('can send offers', async (done) => {
             await this.connectBoth(this.initiator, this.responder, 'task');
             this.responderTask.on('offer', (e: saltyrtc.SaltyRTCEvent) => {
@@ -108,6 +258,15 @@ export default () => { describe('Integration Tests', function() {
                 done();
             });
             this.initiatorTask.sendCandidates(candidates);
+        });
+
+        it('can set up an encryted signaling channel', async (done) => {
+            await setupPeerConnection.bind(this)();
+            const initiatorSdc = ((this.initiatorTask as any).sdc as saltyrtc.tasks.webrtc.SecureDataChannel);
+            const responderSdc = ((this.responderTask as any).sdc as saltyrtc.tasks.webrtc.SecureDataChannel);
+            expect(initiatorSdc.readyState).toEqual('open');
+            expect(responderSdc.readyState).toEqual('open');
+            done();
         });
     });
 
