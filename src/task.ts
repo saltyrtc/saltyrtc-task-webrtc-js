@@ -58,6 +58,14 @@ export class WebRTCTask implements saltyrtc.Task {
     // Events
     private eventRegistry: saltyrtc.EventRegistry = new EventRegistry();
 
+    // Log tag
+    private get logTag(): string {
+        if (this.signaling === null || this.signaling === undefined) {
+            return 'SaltyRTC.WebRTC:';
+        }
+        return 'SaltyRTC.WebRTC.' + this.signaling.role + ':';
+    }
+
     public init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
         this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
@@ -119,12 +127,18 @@ export class WebRTCTask implements saltyrtc.Task {
      */
     public onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
         console.debug('New task message arrived: ' + message.type);
-        // TODO: Validation
         switch (message.type) {
             case 'offer':
+                if (this.validateOffer(message) !== true) return;
+                this.emit({type: 'offer', data: message});
+                break;
             case 'answer':
+                if (this.validateAnswer(message) !== true) return;
+                this.emit({type: 'answer', data: message});
+                break;
             case 'candidates':
-                this.emit({type: message.type, data: message});
+                if (this.validateCandidates(message) !== true) return;
+                this.emit({type: 'candidates', data: message});
                 break;
             case 'handover':
                 if (this.signaling.handoverState.local === false) {
@@ -138,6 +152,65 @@ export class WebRTCTask implements saltyrtc.Task {
             default:
                 console.error('Received message with unknown type:', message.type);
         }
+    }
+
+    /**
+     * Return whether an offer message looks valid.
+     */
+    private validateOffer(message: saltyrtc.messages.TaskMessage): boolean {
+        if (message['offer'] === undefined) {
+            console.warn(this.logTag, 'Offer message does not contain offer');
+            return false;
+        }
+        if (message['offer']['sdp'] === undefined) {
+            console.warn(this.logTag, 'Offer message does not contain offer sdp');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Return whether an answer message looks valid.
+     */
+    private validateAnswer(message: saltyrtc.messages.TaskMessage): boolean {
+        if (message['answer'] === undefined) {
+            console.warn(this.logTag, 'Answer message does not contain answer');
+            return false;
+        }
+        if (message['answer']['sdp'] === undefined) {
+            console.warn(this.logTag, 'Answer message does not contain answer sdp');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Return whether a candidates message looks valid.
+     */
+    private validateCandidates(message: saltyrtc.messages.TaskMessage): boolean {
+        if (message['candidates'] === undefined) {
+            console.warn(this.logTag, 'Candidates message does not contain candidates');
+            return false;
+        }
+        if ((message['candidates'] as any[]).length < 1) {
+            console.warn(this.logTag, 'Candidates message contains empty candidate list');
+            return false;
+        }
+        for (let candidate of message['candidates']) {
+            if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
+                console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                return false;
+            }
+            if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
+                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                return false;
+            }
+            if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
+                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                return false;
+            }
+        }
+        return true;
     }
 
     public sendSignalingMessage(payload: Uint8Array) {
