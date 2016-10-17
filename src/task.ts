@@ -23,7 +23,7 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {EventRegistry} from "saltyrtc-client";
+import {EventRegistry, SignalingError} from "saltyrtc-client";
 import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.Task {
@@ -252,17 +252,59 @@ export class WebRTCTask implements saltyrtc.Task {
     /**
      * Send an offer message to the responder.
      */
-    // TODO
+    public sendOffer(offer: RTCSessionDescriptionInit): void {
+        console.debug(this.logTag, 'Sending offer');
+        try {
+            this.signaling.sendTaskMessage({
+                'type': 'offer',
+                'offer': {
+                    'type': offer.type,
+                    'sdp': offer.sdp,
+                }
+            });
+        } catch (e) {
+            if (e instanceof SignalingError) {
+                console.error(this.logTag, 'Could not send offer:', e.message);
+            }
+        }
+    }
 
     /**
      * Send an answer message to the initiator.
      */
-    // TODO
+    public sendAnswer(answer: RTCSessionDescriptionInit): void {
+        console.debug(this.logTag, 'Sending answer');
+        try {
+            this.signaling.sendTaskMessage({
+                'type': 'answer',
+                'answer': {
+                    'type': answer.type,
+                    'sdp': answer.sdp,
+                }
+            });
+        } catch (e) {
+            if (e instanceof SignalingError) {
+                console.error(this.logTag, 'Could not send answer:', e.message);
+            }
+        }
+    }
 
     /**
      * Send one or more candidates to the peer.
      */
-    // TODO
+    public sendCandidates(candidates: RTCIceCandidateInit[]): void {
+        console.debug(this.logTag, 'Sending', candidates.length, 'candidates');
+        try {
+            this.signaling.sendTaskMessage({
+                'type': 'candidates',
+                'candidates': candidates
+            });
+        } catch (e) {
+            if (e instanceof SignalingError) {
+                console.error(this.logTag, 'Could not send candidates:', e.message);
+            }
+        }
+    }
 
     /**
      * Do the handover from WebSocket to WebRTC data channel on the specified peer connection.
