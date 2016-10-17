@@ -9,6 +9,15 @@ for JavaScript, written in TypeScript.
 The development is still ongoing, the current version is only at alpha-level
 and should not be used for production yet.
 
+## Usage
+
+The following events are available:
+
+* `offer(saltyrtc.messages.TaskMessage)`: An offer message was received.
+* `answer(saltyrtc.messages.TaskMessage)`: An answer message was received.
+* `candidates(saltyrtc.messages.TaskMessage)`: A candidates message was received.
+* `handover(void)`: Handover to the data channel is done.
+
 ## Coding Guidelines
 
 - Write clean ES2015
