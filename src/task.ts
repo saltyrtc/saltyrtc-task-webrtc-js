@@ -5,7 +5,6 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference path='types/saltyrtc.d.ts' />
 /// <reference path='saltyrtc-task-webrtc.d.ts' />
 
 /**
@@ -25,6 +24,7 @@
  * this task.
  */
 import {EventRegistry} from "saltyrtc-client";
+import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.Task {
 
@@ -284,7 +284,10 @@ export class WebRTCTask implements saltyrtc.Task {
      * @param dc The data channel to be wrapped.
      * @return A `SecureDataChannel` instance.
      */
-    // TODO
+    public wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel {
+        console.debug(this.logTag, "Wrapping data channel", dc.id);
+        return new SecureDataChannel(dc, this);
+    }
 
     /**
      * Send a 'close' message to the peer and close the connection.
