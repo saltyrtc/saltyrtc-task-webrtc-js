@@ -17,5 +17,10 @@ config.plugins.push(
         plugins: ['external-helpers']
     })
 )
+config.globals = {
+    'tweetnacl': 'nacl',
+    'saltyrtc-client': 'saltyrtc.client',
+    'chunked-dc': 'chunkedDc'
+};
 
 export default config;
