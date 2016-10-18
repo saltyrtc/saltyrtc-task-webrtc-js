@@ -12,6 +12,14 @@ for JavaScript, written in TypeScript.
 The development is still ongoing, the current version is only at alpha-level
 and should not be used for production yet.
 
+## Installing
+
+### Via npm
+
+You can install this library via `npm`:
+
+    npm install --save saltyrtc-task-webrtc saltyrtc-client
+
 ## Usage
 
 The following events are available:

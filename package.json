@@ -35,8 +35,11 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "chunked-dc": "^0.2.2",
-    "saltyrtc-client": "^0.2.2"
+    "chunked-dc": "^0.2.2"
+  },
+  "peerDependencies": {
+    "saltyrtc-client": "^0.2.2",
+    "tweetnacl": ">= 0.14.3"
   },
   "devDependencies": {
     "babel-es6-polyfill": "^1.1.0",
@@ -51,6 +54,7 @@
     "rollup-plugin-babel": "^2.6.1",
     "rollup-plugin-typescript": "^0.8.1",
     "rollup-plugin-uglify": "^1.0.1",
+    "saltyrtc-client": "^0.2.2",
     "typescript": "^2.0.3",
     "webrtc-adapter": "^2.0.4"
   }
