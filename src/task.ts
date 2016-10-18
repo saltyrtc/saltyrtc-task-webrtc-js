@@ -23,7 +23,7 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {EventRegistry, SignalingError, CloseCode} from "saltyrtc-client";
+import {EventRegistry, SignalingError, CloseCode, SignalingError} from "saltyrtc-client";
 import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
@@ -214,8 +214,23 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         return true;
     }
 
+    /**
+     * Send a signaling message *through the data channel*.
+     *
+     * @param payload Non-encrypted message. The message will be encrypted by
+     *   the underlying secure data channel.
+     * @throws SignalingError when signaling or handover state are not correct.
+     */
     public sendSignalingMessage(payload: Uint8Array) {
-        // TODO
+        if (this.signaling.getState() != 'task') {
+            throw new SignalingError(CloseCode.ProtocolError,
+                'Could not send signaling message: Signaling state is not open.');
+        }
+        if (this.signaling.handoverState.local === false) {
+            throw new SignalingError(CloseCode.ProtocolError,
+                'Could not send signaling message: Handover hasn\'t happened yet.');
+        }
+        this.sdc.send(payload);
     }
 
     public getName(): string {
