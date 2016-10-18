@@ -5,7 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference path='types/RTCPeerConnection.d.ts' />
+/// <reference types='webrtc' />
 /// <reference path='types/tweetnacl.d.ts' />
 
 import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client";

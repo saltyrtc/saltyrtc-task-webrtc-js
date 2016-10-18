@@ -6,7 +6,7 @@
  */
 
 /// <reference types='saltyrtc-client' />
-/// <reference path='src/types/RTCPeerConnection.d.ts' />
+/// <reference types='webrtc' />
 
 declare namespace saltyrtc.tasks.webrtc {
 

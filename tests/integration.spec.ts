@@ -6,6 +6,7 @@
  */
 
 /// <reference path="jasmine.d.ts" />
+/// <reference types='webrtc' />
 
 import {SaltyRTCBuilder, KeyStore} from "saltyrtc-client";
 import {WebRTCTask} from "../src/main";

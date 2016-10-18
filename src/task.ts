@@ -6,6 +6,7 @@
  */
 
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
+/// <reference types='webrtc' />
 
 /**
  * WebRTC Task.
