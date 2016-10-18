@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.1.1 (2016-10-18)
+
+- [changed] Make saltyrtc-client and tweetnacl peer dependencies
+
 ### v0.1.0 (2016-10-18)
 
 - Initial release
