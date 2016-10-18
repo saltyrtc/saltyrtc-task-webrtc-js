@@ -191,7 +191,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         }
 
         // Overwrite data with decoded data
-        fakeEvent['data'] = this.task.getSignaling().decryptFromPeer(box);
+        const decrypted = this.task.getSignaling().decryptFromPeer(box);
+        fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
 
         // Call original handler
         this._onmessage.bind(this.dc)(fakeEvent);
