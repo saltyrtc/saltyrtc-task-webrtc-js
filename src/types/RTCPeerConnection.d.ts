@@ -266,11 +266,11 @@ interface RTCAnswerOptions extends RTCOfferAnswerOptions { }
 
 interface RTCPeerConnection {
 
-  createOffer(options?: RTCOfferOptions): Promise<RTCSessionDescription>;
+  createOffer(options?: RTCOfferOptions): Promise<RTCSessionDescriptionInit>;
   createOffer(successCallback: RTCSessionDescriptionCallback,
               failureCallback?: RTCPeerConnectionErrorCallback,
               constraints?: RTCMediaConstraints): void; // Deprecated
-  createAnswer(options?: RTCAnswerOptions): Promise<RTCSessionDescription>;
+  createAnswer(options?: RTCAnswerOptions): Promise<RTCSessionDescriptionInit>;
   createAnswer(successCallback: RTCSessionDescriptionCallback,
                failureCallback?: RTCPeerConnectionErrorCallback,
                constraints?: RTCMediaConstraints): void; // Deprecated
