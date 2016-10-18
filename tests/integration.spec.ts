@@ -266,6 +266,85 @@ export default () => { describe('Integration Tests', function() {
             const responderSdc = ((this.responderTask as any).sdc as saltyrtc.tasks.webrtc.SecureDataChannel);
             expect(initiatorSdc.readyState).toEqual('open');
             expect(responderSdc.readyState).toEqual('open');
+
+            // Send a message back and forth
+            const pingPoingTest = () => {
+                return new Promise((resolve, reject) => {
+                    responderSdc.onmessage = (e: RTCMessageEvent) => {
+                        expect(new Uint8Array(e.data)).toEqual(Uint8Array.of(1, 2, 3));
+                        responderSdc.send(Uint8Array.of(4, 5, 6));
+                    };
+                    initiatorSdc.onmessage = (e: RTCMessageEvent) => {
+                        expect(new Uint8Array(e.data)).toEqual(Uint8Array.of(4, 5, 6));
+                        resolve();
+                    };
+                    initiatorSdc.send(Uint8Array.of(1, 2, 3));
+                });
+            };
+            await pingPoingTest();
+
+            // Make sure it's encrypted
+            const encryptionTest = () => {
+                return new Promise((resolve, reject) => {
+                    ((responderSdc as any).dc as RTCDataChannel).onmessage = (e: RTCMessageEvent) => {
+                        const bytes = new Uint8Array(e.data);
+                        expect(bytes).not.toEqual(Uint8Array.of(7, 6, 7));
+                        const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
+                                               16 /* authenticator */ + 3 /* data */;
+                        expect(bytes.byteLength).toEqual(expectedLength);
+                        resolve();
+                    };
+                    initiatorSdc.send(Uint8Array.of(7, 6, 7));
+                });
+            };
+            await encryptionTest();
+
+            done();
+        });
+
+        it('can wrap a data channel', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            // Create a new unencrypted datachannel
+            let testUnencrypted = () => {
+                return new Promise((resolve) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.onmessage = (e: RTCMessageEvent) => {
+                            expect(e.data).toEqual('bonjour');
+                            resolve();
+                        };
+                    };
+                    let dc = connections.initiator.createDataChannel('dc1');
+                    dc.binaryType = 'arraybuffer';
+                    dc.send('bonjour');
+                });
+            }
+            await testUnencrypted();
+            console.info('Unencrypted test done');
+
+            // Wrap data channel
+            let testEncrypted = () => {
+                return new Promise((resolve) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        // The receiver should get encrypted data.
+                        e.channel.onmessage = (e: RTCMessageEvent) => {
+                            expect(new Uint8Array(e.data)).not.toEqual(new Uint16Array([1, 1337, 9]));
+                            expect(e.data.byteLength).toEqual(9 + 24 + 16 + 3);
+                            resolve();
+                        };
+                    };
+                    let dc = connections.initiator.createDataChannel('dc2');
+                    dc.binaryType = 'arraybuffer';
+                    let safedc = this.initiatorTask.wrapDataChannel(dc);
+                    safedc.send(new Uint8Array([1, 1337, 9]));
+                });
+            };
+            await testEncrypted();
+            console.info('Encrypted test done');
+
             done();
         });
     });

@@ -132,7 +132,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         const nonce = new DataChannelNonce(this.cookiePair.ours, this.dc.id, csn.overflow, csn.sequenceNumber);
 
         // Encrypt
-        return this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
+        const encrypted = this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
+        return encrypted;
     }
 
     /**
