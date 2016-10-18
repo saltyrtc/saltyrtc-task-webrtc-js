@@ -23,7 +23,7 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {EventRegistry, SignalingError, CloseCode, SignalingError} from "saltyrtc-client";
+import {EventRegistry, CloseCode, SignalingError} from "saltyrtc-client";
 import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
@@ -450,7 +450,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Note: The same event handler object be registered twice. It will only
      * run once.
      */
-    public on(event: string | string[], handler: saltyrtc.SaltyEventHandler): void {
+    public on(event: string | string[], handler: saltyrtc.SaltyRTCEventHandler): void {
         this.eventRegistry.register(event, handler);
     }
 
@@ -460,8 +460,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Note: If the same handler was already registered previously as a regular
      * event handler, it will be completely removed after running once.
      */
-    public once(event: string | string[], handler: saltyrtc.SaltyEventHandler): void {
-        const onceHandler: saltyrtc.SaltyEventHandler = (ev: saltyrtc.SaltyRTCEvent) => {
+    public once(event: string | string[], handler: saltyrtc.SaltyRTCEventHandler): void {
+        const onceHandler: saltyrtc.SaltyRTCEventHandler = (ev: saltyrtc.SaltyRTCEvent) => {
             try {
                 handler(ev);
             } catch (e) {
@@ -480,7 +480,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * If no handler is specified, remove all handlers for the specified
      * event(s).
      */
-    public off(event: string | string[], handler?: saltyrtc.SaltyEventHandler): void {
+    public off(event: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void {
         this.eventRegistry.unregister(event, handler);
     }
 
@@ -504,7 +504,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      *
      * If the handler returns `false`, unregister it.
      */
-    private callHandler(handler: saltyrtc.SaltyEventHandler, event: saltyrtc.SaltyRTCEvent) {
+    private callHandler(handler: saltyrtc.SaltyRTCEventHandler, event: saltyrtc.SaltyRTCEvent) {
         const response = handler(event);
         if (response === false) {
             this.eventRegistry.unregister(event.type, handler);
