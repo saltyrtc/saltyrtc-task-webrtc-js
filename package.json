@@ -1,6 +1,6 @@
 {
   "name": "saltyrtc-task-webrtc",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A SaltyRTC WebRTC task implementation.",
   "main": "dist/saltyrtc-task-webrtc.es5.min.js",
   "module": "dist/saltyrtc-task-webrtc.es2015.js",
@@ -38,7 +38,7 @@
     "chunked-dc": "^0.2.2"
   },
   "peerDependencies": {
-    "saltyrtc-client": "^0.2.2",
+    "saltyrtc-client": "^0.2.4",
     "tweetnacl": ">= 0.14.3"
   },
   "devDependencies": {

@@ -12,6 +12,11 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.1.2 (2016-10-18)
+
+- [changed] Move type declarations to root directory
+- [fixed] Fix types in RTCPeerConnection.d.ts
+
 ### v0.1.1 (2016-10-18)
 
 - [changed] Make saltyrtc-client and tweetnacl peer dependencies
