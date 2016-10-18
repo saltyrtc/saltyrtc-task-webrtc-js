@@ -41,7 +41,7 @@ before_script:
     sleep 2
     cd ..
   # Rollup tests
-  - npm install
+  - npm install && ls node_modules/
   - npm run rollup_tests
 script:
   # Tests should work
