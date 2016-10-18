@@ -9,8 +9,8 @@
 
 import "../node_modules/babel-es6-polyfill/browser-polyfill";
 
-import test_datachannel from "./test_datachannel.spec";
-import test_integration from "./test_integration.spec";
+import test_datachannel from "./datachannel.spec";
+import test_integration from "./integration.spec";
 
 let counter = 1;
 beforeEach(() => console.info('------ TEST', counter++, 'BEGIN ------'));
