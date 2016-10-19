@@ -18,7 +18,7 @@ config.plugins.push(
 )
 config.globals = {
     'tweetnacl': 'nacl',
-    'saltyrtc-client': 'saltyrtc.client',
+    'saltyrtc-client': 'saltyrtcClient',
     'chunked-dc': 'chunkedDc'
 };
 

@@ -38,7 +38,7 @@
     "chunked-dc": "^0.2.2"
   },
   "peerDependencies": {
-    "saltyrtc-client": "^0.2.4",
+    "saltyrtc-client": "^0.2.6",
     "tweetnacl": ">= 0.14.3"
   },
   "devDependencies": {
@@ -54,7 +54,7 @@
     "rollup-plugin-babel": "^2.6.1",
     "rollup-plugin-typescript": "^0.8.1",
     "rollup-plugin-uglify": "^1.0.1",
-    "saltyrtc-client": "^0.2.4",
+    "saltyrtc-client": "^0.2.6",
     "typescript": "^2.0.3",
     "webrtc-adapter": "^2.0.4"
   }
