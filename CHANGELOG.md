@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.2.1 (UNRELEASED)
+
+- [changed] Changed iife dist namespace to `saltyrtcTaskWebrtc`
+
 ### v0.2.0 (2016-10-19)
 
 - [changed] Updated RTCPeerConnection.d.ts file

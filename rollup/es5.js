@@ -4,7 +4,7 @@ import babel from 'rollup-plugin-babel';
 config.entry = 'src/main.es5.ts';
 config.dest = 'dist/saltyrtc-task-webrtc.es5.js';
 config.format = 'iife';
-config.moduleName = 'saltyrtc.tasks.webrtc';
+config.moduleName = 'saltyrtcTaskWebrtc';
 config.useStrict = true;
 config.plugins.push(
     babel({

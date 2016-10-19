@@ -16,6 +16,10 @@ declare namespace saltyrtc.tasks.webrtc {
         dispatchEvent(e: Event): boolean;
     }
 
+    interface SecureDataChannelStatic {
+        new(dc: RTCDataChannel, task: WebRTCTask);
+    }
+
     interface WebRTCTask extends saltyrtc.Task {
         getMaxPacketSize(): number;
         getSignaling(): saltyrtc.Signaling;
@@ -32,4 +36,13 @@ declare namespace saltyrtc.tasks.webrtc {
         off(event: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void;
     }
 
+    interface WebRTCTaskStatic {
+        new(): WebRTCTask;
+    }
+
 }
+
+declare var saltyrtcTaskWebrtc: {
+    SecureDataChannel: saltyrtc.tasks.webrtc.SecureDataChannelStatic,
+    WebRTCTask: saltyrtc.tasks.webrtc.WebRTCTaskStatic,
+};
