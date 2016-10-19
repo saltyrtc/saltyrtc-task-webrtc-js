@@ -1,7 +1,6 @@
 import config from './es2015.js';
 import babel from 'rollup-plugin-babel';
 
-config.entry = 'src/main.es5.ts';
 config.dest = 'dist/saltyrtc-task-webrtc.es5.js';
 config.format = 'iife';
 config.moduleName = 'saltyrtcTaskWebrtc';
