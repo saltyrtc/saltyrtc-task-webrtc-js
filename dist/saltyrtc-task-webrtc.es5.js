@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.2.0
+ * saltyrtc-task-webrtc v0.2.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -28,8 +28,6 @@
  */
 'use strict';
 
-this.saltyrtc = this.saltyrtc || {};
-this.saltyrtc.tasks = this.saltyrtc.tasks || {};
 (function (exports,saltyrtcClient,chunkedDc) {
 'use strict';
 
@@ -3634,4 +3632,4 @@ WebRTCTask.DC_LABEL = 'saltyrtc-signaling';
 
 exports.WebRTCTask = WebRTCTask;
 
-}((this.saltyrtc.tasks.webrtc = this.saltyrtc.tasks.webrtc || {}),saltyrtc.client,chunkedDc));
+}((this.saltyrtcTaskWebrtc = this.saltyrtcTaskWebrtc || {}),saltyrtc.client,chunkedDc));
