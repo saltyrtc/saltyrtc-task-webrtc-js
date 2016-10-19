@@ -6,7 +6,7 @@
  */
 
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
-/// <reference types='webrtc' />
+/// <reference path='types/RTCPeerConnection.d.ts' />
 
 /**
  * WebRTC Task.
@@ -384,7 +384,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             console.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
         }
 
-        this.sdc.onmessage = (ev: RTCMessageEvent) => {
+        this.sdc.onmessage = (ev: MessageEvent) => {
             // Pass decrypted incoming signaling messages to signaling class
             this.signaling.onSignalingPeerMessage(ev.data)
         }

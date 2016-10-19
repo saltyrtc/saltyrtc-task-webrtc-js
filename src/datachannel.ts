@@ -5,7 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference types='webrtc' />
+/// <reference path='types/RTCPeerConnection.d.ts' />
 /// <reference path='types/tweetnacl.d.ts' />
 
 import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client";
@@ -14,7 +14,7 @@ import {WebRTCTask} from "./task";
 import {DataChannelNonce} from "./nonce";
 
 type EventHandler = (event: Event) => void;
-type MessageEventHandler = (event: RTCMessageEvent) => void;
+type MessageEventHandler = (event: MessageEvent) => void;
 
 /**
  * Wrapper around a regular DataChannel.
@@ -28,7 +28,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
     // Wrapped data channel
     private dc: RTCDataChannel;
-    private _onmessage: (event: RTCMessageEvent) => void;
+    private _onmessage: (event: MessageEvent) => void;
 
     // Task instance
     private task: WebRTCTask;
@@ -63,7 +63,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Incoming dc messages are handled depending on the negotiated chunk size
         if (this.chunkSize === 0) {
-            this.dc.onmessage = (event: RTCMessageEvent) => this.onEncryptedMessage(event.data, [event]);
+            this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data, [event]);
         } else {
             this.unchunker = new Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
@@ -139,7 +139,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     /**
      * A new chunk arrived.
      */
-    private onChunk = (event: RTCMessageEvent) => {
+    private onChunk = (event: MessageEvent) => {
         console.debug(this.logTag, 'Received chunk');
 
         // If type is not supported, exit immediately
@@ -164,7 +164,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         }
     };
 
-    private onEncryptedMessage = (data: Uint8Array, context: RTCMessageEvent[]) => {
+    private onEncryptedMessage = (data: Uint8Array, context: MessageEvent[]) => {
         // If _onmessage is not defined, exit immediately.
         if (this._onmessage === undefined) {
             return;
