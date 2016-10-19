@@ -12,7 +12,11 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
-### v0.2.1 (UNRELEASED)
+### v0.2.2 (2016-10-19)
+
+- [fixed] Fix filename of polyfilled dist file
+
+### v0.2.1 (2016-10-19)
 
 - [changed] Changed iife dist namespace to `saltyrtcTaskWebrtc`
 
