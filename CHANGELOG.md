@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.2.0 (2016-10-19)
+
+- [changed] Updated RTCPeerConnection.d.ts file
+
 ### v0.1.2 (2016-10-18)
 
 - [changed] Move type declarations to root directory
