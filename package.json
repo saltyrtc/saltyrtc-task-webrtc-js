@@ -1,6 +1,6 @@
 {
   "name": "saltyrtc-task-webrtc",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A SaltyRTC WebRTC task implementation.",
   "main": "dist/saltyrtc-task-webrtc.es5.min.js",
   "module": "dist/saltyrtc-task-webrtc.es2015.js",
