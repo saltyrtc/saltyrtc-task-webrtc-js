@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.2.4 (2016-10-19)
+
+- [changed] Update saltyrtc-client to latest version
+
 ### v0.2.3 (2016-10-19)
 
 - [fixed] Don't include polyfill in regular ES5 version
