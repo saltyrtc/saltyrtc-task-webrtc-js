@@ -131,15 +131,15 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         switch (message.type) {
             case 'offer':
                 if (this.validateOffer(message) !== true) return;
-                this.emit({type: 'offer', data: message});
+                this.emit({type: 'offer', data: message['offer']});
                 break;
             case 'answer':
                 if (this.validateAnswer(message) !== true) return;
-                this.emit({type: 'answer', data: message});
+                this.emit({type: 'answer', data: message['answer']});
                 break;
             case 'candidates':
                 if (this.validateCandidates(message) !== true) return;
-                this.emit({type: 'candidates', data: message});
+                this.emit({type: 'candidates', data: message['candidates']});
                 break;
             case 'handover':
                 if (this.signaling.handoverState.local === false) {

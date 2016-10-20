@@ -6,7 +6,7 @@
  */
 
 /// <reference path="jasmine.d.ts" />
-/// <reference types='webrtc' />
+/// <reference path="../src/types/RTCPeerConnection.d.ts" />
 
 import {SaltyRTCBuilder, KeyStore} from "saltyrtc-client";
 import {WebRTCTask} from "../src/main";
@@ -84,8 +84,8 @@ export default () => { describe('Integration Tests', function() {
             // Receive answer
             function receiveAnswer(): Promise<RTCSessionDescriptionInit> {
                 return new Promise((resolve) => {
-                    task.once('answer', (message: saltyrtc.messages.TaskMessage) => {
-                        resolve(message.data.answer);
+                    task.once('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
+                        resolve(e.data);
                     });
                 });
             }
@@ -102,8 +102,8 @@ export default () => { describe('Integration Tests', function() {
             // Receive offer
             function receiveOffer(): Promise<RTCSessionDescriptionInit> {
                 return new Promise((resolve) => {
-                    task.once('offer', (message: saltyrtc.messages.TaskMessage) => {
-                        resolve(message.data.offer);
+                    task.once('offer', (offer: saltyrtc.tasks.webrtc.OfferEvent) => {
+                        resolve(offer.data);
                     });
                 });
             }
@@ -126,7 +126,7 @@ export default () => { describe('Integration Tests', function() {
             let role = task.getSignaling().role;
             let logTag = role.charAt(0).toUpperCase() + role.slice(1) + ':';
             console.debug(logTag, 'Setting up ICE candidate handling');
-            pc.onicecandidate = (e: RTCIceCandidateEvent) => {
+            pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
                 if (e.candidate) {
                     task.sendCandidates([{
                         candidate: e.candidate.candidate,
@@ -138,8 +138,8 @@ export default () => { describe('Integration Tests', function() {
             pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
                 console.error(logTag, 'ICE candidate error:', e);
             };
-            task.on('candidates', (message: saltyrtc.messages.TaskMessage) => {
-                for (let candidateInit of message.data.candidates) {
+            task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                for (let candidateInit of e.data) {
                     pc.addIceCandidate(candidateInit);
                 }
             });
@@ -223,10 +223,10 @@ export default () => { describe('Integration Tests', function() {
 
         it('can send offers', async (done) => {
             await this.connectBoth(this.initiator, this.responder, 'task');
-            this.responderTask.on('offer', (e: saltyrtc.SaltyRTCEvent) => {
+            this.responderTask.on('offer', (e: saltyrtc.tasks.webrtc.OfferEvent) => {
                 expect(e.type).toEqual('offer');
-                expect(e.data.offer.type).toEqual('offer');
-                expect(e.data.offer.sdp).toEqual('YOLO');
+                expect(e.data.type).toEqual('offer');
+                expect(e.data.sdp).toEqual('YOLO');
                 done();
             });
             this.initiatorTask.sendOffer({'type': 'offer', 'sdp': 'YOLO'});
@@ -234,10 +234,10 @@ export default () => { describe('Integration Tests', function() {
 
         it('can send answers', async (done) => {
             await this.connectBoth(this.initiator, this.responder, 'task');
-            this.initiatorTask.on('answer', (e: saltyrtc.SaltyRTCEvent) => {
+            this.initiatorTask.on('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
                 expect(e.type).toEqual('answer');
-                expect(e.data.answer.type).toEqual('answer');
-                expect(e.data.answer.sdp).toEqual('YOLO');
+                expect(e.data.type).toEqual('answer');
+                expect(e.data.sdp).toEqual('YOLO');
                 done();
             });
             this.responderTask.sendAnswer({'type': 'answer', 'sdp': 'YOLO'});
@@ -246,16 +246,16 @@ export default () => { describe('Integration Tests', function() {
         it('can send candidates', async (done) => {
             await this.connectBoth(this.initiator, this.responder, 'task');
 
-            const candidates = [
+            const candidates: saltyrtc.tasks.webrtc.Candidates = [
                 {'candidate': 'FOO', 'sdpMid': 'data', 'sdpMLineIndex': 0},
                 {'candidate': 'BAR', 'sdpMid': 'data', 'sdpMLineIndex': 1},
             ];
 
-            this.responderTask.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
+            this.responderTask.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
                 expect(e.type).toEqual('candidates');
-                expect(Array.isArray(e.data.candidates)).toEqual(true);
-                expect(e.data.candidates.length).toEqual(candidates.length);
-                expect(e.data.candidates).toEqual(candidates);
+                expect(Array.isArray(e.data)).toEqual(true);
+                expect(e.data.length).toEqual(candidates.length);
+                expect(e.data).toEqual(candidates);
                 done();
             });
             this.initiatorTask.sendCandidates(candidates);
@@ -271,11 +271,11 @@ export default () => { describe('Integration Tests', function() {
             // Send a message back and forth
             const pingPoingTest = () => {
                 return new Promise((resolve, reject) => {
-                    responderSdc.onmessage = (e: RTCMessageEvent) => {
+                    responderSdc.onmessage = (e: MessageEvent) => {
                         expect(new Uint8Array(e.data)).toEqual(Uint8Array.of(1, 2, 3));
                         responderSdc.send(Uint8Array.of(4, 5, 6));
                     };
-                    initiatorSdc.onmessage = (e: RTCMessageEvent) => {
+                    initiatorSdc.onmessage = (e: MessageEvent) => {
                         expect(new Uint8Array(e.data)).toEqual(Uint8Array.of(4, 5, 6));
                         resolve();
                     };
@@ -287,7 +287,7 @@ export default () => { describe('Integration Tests', function() {
             // Make sure it's encrypted
             const encryptionTest = () => {
                 return new Promise((resolve, reject) => {
-                    ((responderSdc as any).dc as RTCDataChannel).onmessage = (e: RTCMessageEvent) => {
+                    ((responderSdc as any).dc as RTCDataChannel).onmessage = (e: MessageEvent) => {
                         const bytes = new Uint8Array(e.data);
                         expect(bytes).not.toEqual(Uint8Array.of(7, 6, 7));
                         const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
@@ -313,7 +313,7 @@ export default () => { describe('Integration Tests', function() {
             let testUnencrypted = () => {
                 return new Promise((resolve) => {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
-                        e.channel.onmessage = (e: RTCMessageEvent) => {
+                        e.channel.onmessage = (e: MessageEvent) => {
                             expect(e.data).toEqual('bonjour');
                             resolve();
                         };
@@ -331,7 +331,7 @@ export default () => { describe('Integration Tests', function() {
                 return new Promise((resolve) => {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         // The receiver should get encrypted data.
-                        e.channel.onmessage = (e: RTCMessageEvent) => {
+                        e.channel.onmessage = (e: MessageEvent) => {
                             expect(new Uint8Array(e.data)).not.toEqual(new Uint16Array([1, 1337, 9]));
                             expect(e.data.byteLength).toEqual(9 + 24 + 16 + 3);
                             resolve();

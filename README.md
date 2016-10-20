@@ -24,9 +24,9 @@ You can install this library via `npm`:
 
 The following events are available:
 
-* `offer(saltyrtc.messages.TaskMessage)`: An offer message was received.
-* `answer(saltyrtc.messages.TaskMessage)`: An answer message was received.
-* `candidates(saltyrtc.messages.TaskMessage)`: A candidates message was received.
+* `offer(saltyrtc.tasks.webrtc.Offer)`: An offer message was received.
+* `answer(saltyrtc.tasks.webrtc.Answer)`: An answer message was received.
+* `candidates(saltyrtc.tasks.webrtc.Candidates)`: A candidates message was received.
 * `handover(void)`: Handover to the data channel is done.
 
 ## Releasing

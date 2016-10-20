@@ -40,6 +40,19 @@ declare namespace saltyrtc.tasks.webrtc {
         new(): WebRTCTask;
     }
 
+    type Offer = RTCSessionDescriptionInit;
+    type Answer = RTCSessionDescriptionInit;
+    type Candidates = RTCIceCandidateInit[];
+
+    interface OfferEvent extends saltyrtc.SaltyRTCEvent {
+        data: Offer;
+    }
+    interface AnswerEvent extends saltyrtc.SaltyRTCEvent {
+        data: Answer;
+    }
+    interface CandidatesEvent extends saltyrtc.SaltyRTCEvent {
+        data: Candidates;
+    }
 }
 
 declare var saltyrtcTaskWebrtc: {
