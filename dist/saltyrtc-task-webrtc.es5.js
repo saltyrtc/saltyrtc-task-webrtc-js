@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.2.4
+ * saltyrtc-task-webrtc v0.3.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -239,6 +239,30 @@ var set$1 = function set$1(object, property, value, receiver) {
   }
 
   return value;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var toConsumableArray = function (arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
+
+    return arr2;
+  } else {
+    return Array.from(arr);
+  }
 };
 
 var DataChannelNonce = function () {
@@ -605,6 +629,8 @@ var WebRTCTask = function () {
         this.initialized = false;
         this.exclude = new Set();
         this.eventRegistry = new saltyrtcClient.EventRegistry();
+        this.candidates = [];
+        this.sendCandidatesTimeout = null;
     }
 
     createClass(WebRTCTask, [{
@@ -680,24 +706,23 @@ var WebRTCTask = function () {
             switch (message.type) {
                 case 'offer':
                     if (this.validateOffer(message) !== true) return;
-                    this.emit({ type: 'offer', data: message });
+                    this.emit({ type: 'offer', data: message['offer'] });
                     break;
                 case 'answer':
                     if (this.validateAnswer(message) !== true) return;
-                    this.emit({ type: 'answer', data: message });
+                    this.emit({ type: 'answer', data: message['answer'] });
                     break;
                 case 'candidates':
                     if (this.validateCandidates(message) !== true) return;
-                    this.emit({ type: 'candidates', data: message });
+                    this.emit({ type: 'candidates', data: message['candidates'] });
                     break;
                 case 'handover':
                     if (this.signaling.handoverState.local === false) {
                         this.sendHandover();
                     }
                     this.signaling.handoverState.peer = true;
-                    if (this.signaling.handoverState.local && this.signaling.handoverState.peer) {
+                    if (this.signaling.handoverState.both) {
                         console.info('Handover to data channel finished');
-                        this.emit({ 'type': 'handover' });
                     }
                     break;
                 default:
@@ -860,28 +885,46 @@ var WebRTCTask = function () {
             }
         }
     }, {
+        key: "sendCandidate",
+        value: function sendCandidate(candidate) {
+            this.sendCandidates([candidate]);
+        }
+    }, {
         key: "sendCandidates",
         value: function sendCandidates(candidates) {
-            console.debug(this.logTag, 'Sending', candidates.length, 'candidate(s)');
-            try {
-                this.signaling.sendTaskMessage({
-                    'type': 'candidates',
-                    'candidates': candidates
-                });
-            } catch (e) {
-                if (e instanceof saltyrtcClient.SignalingError) {
-                    console.error(this.logTag, 'Could not send candidates:', e.message);
-                    this.signaling.resetConnection(e.closeCode);
+            var _candidates,
+                _this = this;
+
+            console.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
+            (_candidates = this.candidates).push.apply(_candidates, toConsumableArray(candidates));
+            var sendFunc = function sendFunc() {
+                try {
+                    console.debug(_this.logTag, 'Sending', _this.candidates.length, 'candidate(s)');
+                    _this.signaling.sendTaskMessage({
+                        'type': 'candidates',
+                        'candidates': _this.candidates
+                    });
+                } catch (e) {
+                    if (e instanceof saltyrtcClient.SignalingError) {
+                        console.error(_this.logTag, 'Could not send candidates:', e.message);
+                        _this.signaling.resetConnection(e.closeCode);
+                    }
+                } finally {
+                    _this.candidates = [];
+                    _this.sendCandidatesTimeout = null;
                 }
+            };
+            if (this.sendCandidatesTimeout === null) {
+                this.sendCandidatesTimeout = window.setTimeout(sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
             }
         }
     }, {
         key: "handover",
         value: function handover(pc) {
-            var _this = this;
+            var _this2 = this;
 
             console.debug(this.logTag, 'Initiate handover');
-            if (this.signaling.handoverState.local || this.signaling.handoverState.peer) {
+            if (this.signaling.handoverState.any) {
                 console.error(this.logTag, 'Handover already in progress or finished');
                 return;
             }
@@ -899,21 +942,21 @@ var WebRTCTask = function () {
             dc.binaryType = 'arraybuffer';
             this.sdc = new SecureDataChannel(dc, this);
             this.sdc.onopen = function (ev) {
-                _this.sendHandover();
+                _this2.sendHandover();
             };
             this.sdc.onclose = function (ev) {
-                if (_this.signaling.handoverState.local || _this.signaling.handoverState.peer) {
-                    _this.signaling.setState('closed');
+                if (_this2.signaling.handoverState.any) {
+                    _this2.signaling.setState('closed');
                 }
             };
             this.sdc.onerror = function (ev) {
-                console.error(_this.logTag, 'Signaling data channel error:', ev);
+                console.error(_this2.logTag, 'Signaling data channel error:', ev);
             };
             this.sdc.onbufferedamountlow = function (ev) {
-                console.warn(_this.logTag, 'Signaling data channel: Buffered amount low:', ev);
+                console.warn(_this2.logTag, 'Signaling data channel: Buffered amount low:', ev);
             };
             this.sdc.onmessage = function (ev) {
-                _this.signaling.onSignalingPeerMessage(ev.data);
+                _this2.signaling.onSignalingPeerMessage(ev.data);
             };
         }
     }, {
@@ -929,9 +972,8 @@ var WebRTCTask = function () {
                 }
             }
             this.signaling.handoverState.local = true;
-            if (this.signaling.handoverState.local && this.signaling.handoverState.peer) {
+            if (this.signaling.handoverState.both) {
                 console.info(this.logTag, 'Handover to data channel finished');
-                this.emit({ 'type': 'handover' });
             }
         }
     }, {
@@ -960,16 +1002,16 @@ var WebRTCTask = function () {
     }, {
         key: "once",
         value: function once(event, handler) {
-            var _this2 = this;
+            var _this3 = this;
 
             var onceHandler = function onceHandler(ev) {
                 try {
                     handler(ev);
                 } catch (e) {
-                    _this2.off(ev.type, onceHandler);
+                    _this3.off(ev.type, onceHandler);
                     throw e;
                 }
-                _this2.off(ev.type, onceHandler);
+                _this3.off(ev.type, onceHandler);
             };
             this.eventRegistry.register(event, onceHandler);
         }
@@ -1037,6 +1079,7 @@ WebRTCTask.MAX_PACKET_SIZE = 16384;
 WebRTCTask.FIELD_EXCLUDE = 'exclude';
 WebRTCTask.FIELD_MAX_PACKET_SIZE = 'max_packet_size';
 WebRTCTask.DC_LABEL = 'saltyrtc-signaling';
+WebRTCTask.CANDIDATE_BUFFERING_MS = 5;
 
 exports.WebRTCTask = WebRTCTask;
 

@@ -12,6 +12,14 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.3.0 (2016-10-20)
+
+- [added] Add sendCandidate() method
+- [added] Add 5ms of buffering for candidates
+- [changed] Emit data directly in offer/answer/candidates events
+- [changed] Update saltyrtc-client to latest version
+- [removed] Remove handover event on task
+
 ### v0.2.4 (2016-10-19)
 
 - [changed] Update saltyrtc-client to latest version
