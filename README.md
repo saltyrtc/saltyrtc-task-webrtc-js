@@ -27,7 +27,8 @@ The following events are available:
 * `offer(saltyrtc.tasks.webrtc.Offer)`: An offer message was received.
 * `answer(saltyrtc.tasks.webrtc.Answer)`: An answer message was received.
 * `candidates(saltyrtc.tasks.webrtc.Candidates)`: A candidates message was received.
-* `handover(void)`: Handover to the data channel is done.
+
+To know when the handover is finished, please subscribe to the `handover` event on the client directly.
 
 ## Releasing
 

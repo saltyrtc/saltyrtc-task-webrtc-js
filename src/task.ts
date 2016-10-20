@@ -151,9 +151,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                     this.sendHandover();
                 }
                 this.signaling.handoverState.peer = true;
-                if (this.signaling.handoverState.local && this.signaling.handoverState.peer) {
+                if (this.signaling.handoverState.both) {
                     console.info('Handover to data channel finished');
-                    this.emit({'type': 'handover'});
                 }
                 break;
             default:
@@ -363,7 +362,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         console.debug(this.logTag, 'Initiate handover');
 
         // Make sure handover hasn't already happened
-        if (this.signaling.handoverState.local || this.signaling.handoverState.peer) {
+        if (this.signaling.handoverState.any) {
             console.error(this.logTag, 'Handover already in progress or finished');
             return;
         }
@@ -396,7 +395,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         this.sdc.onclose = (ev: Event) => {
             // If handover has already happened, set signaling state to closed
-            if (this.signaling.handoverState.local || this.signaling.handoverState.peer) {
+            if (this.signaling.handoverState.any) {
                 this.signaling.setState('closed');
             }
         };
@@ -437,9 +436,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         this.signaling.handoverState.local = true;
 
         // Check whether we're done
-        if (this.signaling.handoverState.local && this.signaling.handoverState.peer) {
+        if (this.signaling.handoverState.both) {
             console.info(this.logTag, 'Handover to data channel finished');
-            this.emit({'type': 'handover'});
         }
     }
 

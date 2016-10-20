@@ -208,8 +208,8 @@ export default () => { describe('Integration Tests', function() {
                             resolve();
                         }
                     };
-                    this.initiatorTask.once('handover', handoverHandler);
-                    this.responderTask.once('handover', handoverHandler);
+                    this.initiator.once('handover', handoverHandler);
+                    this.responder.once('handover', handoverHandler);
                 });
             };
             await handover();
