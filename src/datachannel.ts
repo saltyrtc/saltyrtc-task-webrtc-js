@@ -8,7 +8,7 @@
 /// <reference path='types/RTCPeerConnection.d.ts' />
 /// <reference path='types/tweetnacl.d.ts' />
 
-import {CookiePair, CombinedSequencePair, Box} from "saltyrtc-client";
+import {CookiePair, CombinedSequencePair, Box, CloseCode} from "saltyrtc-client";
 import {Chunker, Unchunker} from "chunked-dc";
 import {WebRTCTask} from "./task";
 import {DataChannelNonce} from "./nonce";
@@ -187,7 +187,13 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         } catch (e) {
             console.error(this.logTag, 'Invalid nonce:', e);
             console.error(this.logTag, 'Closing data channel');
+
+            // Close this data channel
             this.close();
+
+            // Close the signaling as well
+            this.task.close(CloseCode.ProtocolError);
+
             return;
         }
 
