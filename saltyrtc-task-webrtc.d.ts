@@ -25,6 +25,7 @@ declare namespace saltyrtc.tasks.webrtc {
         getSignaling(): saltyrtc.Signaling;
         sendOffer(offer: RTCSessionDescriptionInit): void;
         sendAnswer(answer: RTCSessionDescriptionInit): void;
+        sendCandidate(candidate: RTCIceCandidateInit): void;
         sendCandidates(candidates: RTCIceCandidateInit[]): void;
         handover(pc: RTCPeerConnection): void;
         wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel;

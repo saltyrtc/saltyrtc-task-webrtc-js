@@ -309,6 +309,13 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
+     * Send a candidate to the peer.
+     */
+    public sendCandidate(candidate: RTCIceCandidateInit): void {
+        this.sendCandidates([candidate]);
+    }
+
+    /**
      * Send one or more candidates to the peer.
      */
     public sendCandidates(candidates: RTCIceCandidateInit[]): void {
