@@ -128,11 +128,11 @@ export default () => { describe('Integration Tests', function() {
             console.debug(logTag, 'Setting up ICE candidate handling');
             pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
                 if (e.candidate) {
-                    task.sendCandidates([{
+                    task.sendCandidate({
                         candidate: e.candidate.candidate,
                         sdpMid: e.candidate.sdpMid,
                         sdpMLineIndex: e.candidate.sdpMLineIndex,
-                    }]);
+                    });
                 }
             };
             pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
@@ -259,6 +259,25 @@ export default () => { describe('Integration Tests', function() {
                 done();
             });
             this.initiatorTask.sendCandidates(candidates);
+        });
+
+        it('can send buffered candidates', async (done) => {
+            await this.connectBoth(this.initiator, this.responder, 'task');
+
+            const candidates: saltyrtc.tasks.webrtc.Candidates = [
+                {'candidate': 'FOO', 'sdpMid': 'data', 'sdpMLineIndex': 0},
+                {'candidate': 'BAR', 'sdpMid': 'data', 'sdpMLineIndex': 1},
+            ];
+
+            this.responderTask.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                expect(e.type).toEqual('candidates');
+                expect(Array.isArray(e.data)).toEqual(true);
+                expect(e.data.length).toEqual(candidates.length);
+                expect(e.data).toEqual(candidates);
+                done();
+            });
+            this.initiatorTask.sendCandidate(candidates[0]);
+            this.initiatorTask.sendCandidate(candidates[1]);
         });
 
         it('can set up an encryted signaling channel', async (done) => {

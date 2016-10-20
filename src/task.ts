@@ -59,6 +59,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     // Events
     private eventRegistry: saltyrtc.EventRegistry = new EventRegistry();
 
+    // Candidate buffering
+    private static CANDIDATE_BUFFERING_MS = 5;
+    private candidates: RTCIceCandidateInit[] = [];
+    private sendCandidatesTimeout: number | null = null;
+
     // Log tag
     private get logTag(): string {
         if (this.signaling === null || this.signaling === undefined) {
@@ -319,17 +324,32 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Send one or more candidates to the peer.
      */
     public sendCandidates(candidates: RTCIceCandidateInit[]): void {
-        console.debug(this.logTag, 'Sending', candidates.length, 'candidate(s)');
-        try {
-            this.signaling.sendTaskMessage({
-                'type': 'candidates',
-                'candidates': candidates
-            });
-        } catch (e) {
-            if (e instanceof SignalingError) {
-                console.error(this.logTag, 'Could not send candidates:', e.message);
-                this.signaling.resetConnection(e.closeCode);
+        // Add to buffer
+        console.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
+        this.candidates.push(...candidates);
+
+        // Sending function
+        const sendFunc = () => {
+            try {
+                console.debug(this.logTag, 'Sending', this.candidates.length, 'candidate(s)');
+                this.signaling.sendTaskMessage({
+                    'type': 'candidates',
+                    'candidates': this.candidates
+                });
+            } catch (e) {
+                if (e instanceof SignalingError) {
+                    console.error(this.logTag, 'Could not send candidates:', e.message);
+                    this.signaling.resetConnection(e.closeCode);
+                }
+            } finally {
+                this.candidates = [];
+                this.sendCandidatesTimeout = null;
             }
+        }
+
+        // Add a new timeout if one isn't in progress already
+        if (this.sendCandidatesTimeout === null) {
+            this.sendCandidatesTimeout = window.setTimeout(sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
         }
     }
 
