@@ -24,7 +24,7 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {EventRegistry, CloseCode, SignalingError} from "saltyrtc-client";
+import {EventRegistry, SignalingError, CloseCode, explainCloseCode} from "saltyrtc-client";
 import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
@@ -468,7 +468,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * @param reason The close code.
      */
     public close(reason: number): void {
-        console.debug('Closing signaling data channel:', reason);
+        console.debug('Closing signaling data channel:', explainCloseCode(reason));
         this.sdc.close();
         // TODO: Is this correct?
     }
