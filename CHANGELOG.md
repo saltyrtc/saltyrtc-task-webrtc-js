@@ -12,6 +12,12 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.3.1 (2016-11-03)
+
+- [changed] Update saltyrtc-client to latest version
+- [changed] Close entire signaling channel when a secure dc receives an invalid nonce
+- [changed] Explain close code when closing signaling data channel
+
 ### v0.3.0 (2016-10-20)
 
 - [added] Add sendCandidate() method

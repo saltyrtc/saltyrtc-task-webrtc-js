@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.3.0
+ * saltyrtc-task-webrtc v0.3.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -380,6 +380,7 @@ var SecureDataChannel = function () {
                 console.error(_this.logTag, 'Invalid nonce:', e);
                 console.error(_this.logTag, 'Closing data channel');
                 _this.close();
+                _this.task.close(saltyrtcClient.CloseCode.ProtocolError);
                 return;
             }
             var decrypted = _this.task.getSignaling().decryptFromPeer(box);
@@ -991,7 +992,7 @@ var WebRTCTask = function () {
     }, {
         key: "close",
         value: function close(reason) {
-            console.debug('Closing signaling data channel:', reason);
+            console.debug('Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
             this.sdc.close();
         }
     }, {

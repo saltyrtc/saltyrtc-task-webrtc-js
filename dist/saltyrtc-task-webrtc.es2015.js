@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.3.0
+ * saltyrtc-task-webrtc v0.3.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -28,7 +28,7 @@
  */
 'use strict';
 
-import { Box, CloseCode, CombinedSequencePair, Cookie, CookiePair, EventRegistry, SignalingError } from 'saltyrtc-client';
+import { Box, CloseCode, CombinedSequencePair, Cookie, CookiePair, EventRegistry, SignalingError, explainCloseCode } from 'saltyrtc-client';
 import { Chunker, Unchunker } from 'chunked-dc';
 
 class DataChannelNonce {
@@ -113,6 +113,7 @@ class SecureDataChannel {
                 console.error(this.logTag, 'Invalid nonce:', e);
                 console.error(this.logTag, 'Closing data channel');
                 this.close();
+                this.task.close(CloseCode.ProtocolError);
                 return;
             }
             const decrypted = this.task.getSignaling().decryptFromPeer(box);
@@ -541,7 +542,7 @@ class WebRTCTask {
         this.signaling.resetConnection(CloseCode.goingAway);
     }
     close(reason) {
-        console.debug('Closing signaling data channel:', reason);
+        console.debug('Closing signaling data channel:', explainCloseCode(reason));
         this.sdc.close();
     }
     on(event, handler) {
