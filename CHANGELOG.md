@@ -12,7 +12,7 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
-### v0.3.2 (UNRELEASED)
+### v0.3.2 (2016-11-07)
 
 - [fixed] Fix bug in data handling in `SecureDataChannel.onmessage`
 

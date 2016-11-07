@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.3.1
+ * saltyrtc-task-webrtc v0.3.2
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -957,7 +957,8 @@ var WebRTCTask = function () {
                 console.warn(_this2.logTag, 'Signaling data channel: Buffered amount low:', ev);
             };
             this.sdc.onmessage = function (ev) {
-                _this2.signaling.onSignalingPeerMessage(ev.data);
+                var decryptedData = new Uint8Array(ev.data);
+                _this2.signaling.onSignalingPeerMessage(decryptedData);
             };
         }
     }, {
