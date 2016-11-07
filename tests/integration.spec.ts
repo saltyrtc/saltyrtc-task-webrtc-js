@@ -69,6 +69,7 @@ export default () => { describe('Integration Tests', function() {
                 .initiatorInfo(this.initiator.permanentKeyBytes, this.initiator.authTokenBytes)
                 .usingTasks([this.responderTask])
                 .asResponder() as saltyrtc.SaltyRTC;
+            this.lastCandidate = null;
         });
 
         /**
@@ -122,12 +123,13 @@ export default () => { describe('Integration Tests', function() {
         /**
          * Set up transmission and processing of ICE candidates.
          */
-        function setupIceCandidateHandling(pc: RTCPeerConnection, task: WebRTCTask) {
+        function setupIceCandidateHandling(pc: RTCPeerConnection, task: WebRTCTask, _this: any) {
             let role = task.getSignaling().role;
             let logTag = role.charAt(0).toUpperCase() + role.slice(1) + ':';
             console.debug(logTag, 'Setting up ICE candidate handling');
             pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
                 if (e.candidate) {
+                    _this.lastCandidate = e.candidate;
                     task.sendCandidate({
                         candidate: e.candidate.candidate,
                         sdpMid: e.candidate.sdpMid,
@@ -192,8 +194,8 @@ export default () => { describe('Integration Tests', function() {
             };
 
             // Set up ICE candidate handling
-            setupIceCandidateHandling(initiatorConn, this.initiatorTask);
-            setupIceCandidateHandling(responderConn, this.responderTask);
+            setupIceCandidateHandling(initiatorConn, this.initiatorTask, this);
+            setupIceCandidateHandling(responderConn, this.responderTask, this);
 
             // Do handover
             let handover = () => {
@@ -364,6 +366,30 @@ export default () => { describe('Integration Tests', function() {
             };
             await testEncrypted();
             console.info('Encrypted test done');
+
+            done();
+        });
+
+        it('can send signaling messages after handover', async (done) => {
+            await setupPeerConnection.bind(this)();
+            const initiatorSdc = ((this.initiatorTask as any).sdc as saltyrtc.tasks.webrtc.SecureDataChannel);
+            const responderSdc = ((this.responderTask as any).sdc as saltyrtc.tasks.webrtc.SecureDataChannel);
+            expect(initiatorSdc.readyState).toEqual('open');
+            expect(responderSdc.readyState).toEqual('open');
+
+            const candidateTest = () => {
+                return new Promise((resolve) => {
+                    this.responderTask.once('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                        resolve();
+                    });
+                    this.initiatorTask.sendCandidate({
+                        candidate: this.lastCandidate.candidate,
+                        sdpMid: this.lastCandidate.sdpMid,
+                        sdpMLineIndex: this.lastCandidate.sdpMLineIndex,
+                    });
+                });
+            }
+            await candidateTest();
 
             done();
         });

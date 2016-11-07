@@ -344,7 +344,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 this.candidates = [];
                 this.sendCandidatesTimeout = null;
             }
-        }
+        };
 
         // Add a new timeout if one isn't in progress already
         if (this.sendCandidatesTimeout === null) {
@@ -408,11 +408,12 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         this.sdc.onbufferedamountlow = (ev: Event) => {
             // Log warning
             console.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
-        }
+        };
 
         this.sdc.onmessage = (ev: MessageEvent) => {
             // Pass decrypted incoming signaling messages to signaling class
-            this.signaling.onSignalingPeerMessage(ev.data)
+            let decryptedData = new Uint8Array(ev.data);
+            this.signaling.onSignalingPeerMessage(decryptedData);
         }
     }
 

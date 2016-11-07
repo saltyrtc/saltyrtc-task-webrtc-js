@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.3.2 (UNRELEASED)
+
+- [fixed] Fix bug in data handling in `SecureDataChannel.onmessage`
+
 ### v0.3.1 (2016-11-03)
 
 - [changed] Update saltyrtc-client to latest version
