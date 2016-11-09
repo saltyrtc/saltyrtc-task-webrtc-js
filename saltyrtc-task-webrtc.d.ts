@@ -5,8 +5,8 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
+/// <reference types='webrtc' />
 /// <reference types='saltyrtc-client' />
-/// <reference path='src/types/RTCPeerConnection.d.ts' />
 
 declare namespace saltyrtc.tasks.webrtc {
 

@@ -5,7 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-import {Cookie} from "saltyrtc-client";
+/// <reference types='saltyrtc-client' />
 
 
 /**
@@ -21,14 +21,14 @@ import {Cookie} from "saltyrtc-client";
  * - Q: Sequence number (4 bytes)
  */
 export class DataChannelNonce {
-    private _cookie: Cookie;
+    private _cookie: saltyrtc.Cookie;
     private _overflow: number;
     private _sequenceNumber: number;
     private _channelId: number;
 
     public static TOTAL_LENGTH = 24;
 
-    constructor(cookie: Cookie, channelId: number, overflow: number, sequenceNumber: number) {
+    constructor(cookie: saltyrtc.Cookie, channelId: number, overflow: number, sequenceNumber: number) {
         this._cookie = cookie;
         this._overflow = overflow;
         this._sequenceNumber = sequenceNumber;
@@ -55,7 +55,7 @@ export class DataChannelNonce {
         const view = new DataView(packet);
 
         // Parse and return nonce
-        const cookie = new Cookie(new Uint8Array(packet, 0, 16));
+        const cookie = new saltyrtcClient.Cookie(new Uint8Array(packet, 0, 16));
         const channelId = view.getUint16(16);
         const overflow = view.getUint16(18);
         const sequenceNumber = view.getUint32(20);

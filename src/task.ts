@@ -5,8 +5,9 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
+/// <reference types='webrtc' />
+/// <reference types='saltyrtc-client' />
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
-/// <reference path='types/RTCPeerConnection.d.ts' />
 
 /**
  * WebRTC Task.
@@ -24,7 +25,6 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {EventRegistry, SignalingError, CloseCode, explainCloseCode} from "saltyrtc-client";
 import {SecureDataChannel} from "./datachannel";
 
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
@@ -61,7 +61,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private sdc: saltyrtc.tasks.webrtc.SecureDataChannel = null;
 
     // Events
-    private eventRegistry: saltyrtc.EventRegistry = new EventRegistry();
+    private eventRegistry: saltyrtc.EventRegistry = new saltyrtcClient.EventRegistry();
 
     // Candidate buffering
     private static CANDIDATE_BUFFERING_MS = 5;
@@ -185,7 +185,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             case 'handover':
                 if (this.doHandover === false) {
                     console.error(this.logTag, 'Received unexpected handover message from peer');
-                    this.signaling.resetConnection(CloseCode.ProtocolError);
+                    this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
                 }
                 if (this.signaling.handoverState.local === false) {
@@ -271,11 +271,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     sendSignalingMessage(payload: Uint8Array) {
         if (this.signaling.getState() != 'task') {
-            throw new SignalingError(CloseCode.ProtocolError,
+            throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
                 'Could not send signaling message: Signaling state is not open.');
         }
         if (this.signaling.handoverState.local === false) {
-            throw new SignalingError(CloseCode.ProtocolError,
+            throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
                 'Could not send signaling message: Handover hasn\'t happened yet.');
         }
         this.sdc.send(payload);
@@ -343,7 +343,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 }
             });
         } catch (e) {
-            if (e instanceof SignalingError) {
+            if (e instanceof saltyrtcClient.SignalingError) {
                 console.error(this.logTag, 'Could not send offer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -364,7 +364,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 }
             });
         } catch (e) {
-            if (e instanceof SignalingError) {
+            if (e instanceof saltyrtcClient.SignalingError) {
                 console.error(this.logTag, 'Could not send answer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -395,7 +395,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                     'candidates': this.candidates
                 });
             } catch (e) {
-                if (e instanceof SignalingError) {
+                if (e instanceof saltyrtcClient.SignalingError) {
                     console.error(this.logTag, 'Could not send candidates:', e.message);
                     this.signaling.resetConnection(e.closeCode);
                 }
@@ -437,7 +437,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         // Make sure the dc id is set
         if (this.sdcId === undefined || this.sdcId === null) {
             console.error(this.logTag, 'Data channel id not set');
-            this.signaling.resetConnection(CloseCode.InternalError);
+            this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
             throw new Error('Data channel id not set');
         }
 
@@ -496,7 +496,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         try {
             this.signaling.sendTaskMessage({'type': 'handover'});
         } catch (e) {
-            if (e instanceof SignalingError) {
+            if (e instanceof saltyrtcClient.SignalingError) {
                 console.error(this.logTag, 'Could not send handover message', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -530,7 +530,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * @param reason The close code.
      */
     public close(reason: number): void {
-        console.debug('Closing signaling data channel:', explainCloseCode(reason));
+        console.debug('Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
         if (this.sdc !== null) {
             this.sdc.close();
         }

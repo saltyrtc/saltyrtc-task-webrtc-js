@@ -48,10 +48,7 @@ script:
   # Tests should work
   - npm test
   # Types should be OK
-  - |
-    mv tsconfig.json tsconfig.ignore
-    node_modules/.bin/tsc --target ES2015 --noEmit src/main.ts
-    mv tsconfig.ignore tsconfig.json
+  - npm run validate
   # Building a distribution should work
   - npm run dist
 after_script:

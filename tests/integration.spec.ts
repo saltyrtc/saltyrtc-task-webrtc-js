@@ -5,8 +5,8 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
+/// <reference types="webrtc" />
 /// <reference path="jasmine.d.ts" />
-/// <reference path="../src/types/RTCPeerConnection.d.ts" />
 
 import {SaltyRTCBuilder, KeyStore} from "saltyrtc-client";
 import {WebRTCTask} from "../src/main";

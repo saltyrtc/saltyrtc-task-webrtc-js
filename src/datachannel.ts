@@ -5,11 +5,10 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference path='types/RTCPeerConnection.d.ts' />
+/// <reference types='webrtc' />
+/// <reference types='chunked-dc' />
 /// <reference path='types/tweetnacl.d.ts' />
 
-import {CookiePair, CombinedSequencePair, Box, CloseCode} from "saltyrtc-client";
-import {Chunker, Unchunker} from "chunked-dc";
 import {WebRTCTask} from "./task";
 import {DataChannelNonce} from "./nonce";
 
@@ -39,7 +38,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     private chunkSize;
     private messageNumber = 0;
     private chunkCount = 0;
-    private unchunker: Unchunker;
+    private unchunker: chunkedDc.Unchunker;
 
     // SaltyRTC
     private cookiePair: saltyrtc.CookiePair;
@@ -53,8 +52,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         }
         this.dc = dc;
         this.task = task;
-        this.cookiePair = new CookiePair();
-        this.csnPair = new CombinedSequencePair();
+        this.cookiePair = new saltyrtcClient.CookiePair();
+        this.csnPair = new saltyrtcClient.CombinedSequencePair();
 
         this.chunkSize = this.task.getMaxPacketSize();
         if (this.chunkSize === null) {
@@ -65,7 +64,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         if (this.chunkSize === 0) {
             this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data, [event]);
         } else {
-            this.unchunker = new Unchunker();
+            this.unchunker = new chunkedDc.Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
             this.dc.onmessage = this.onChunk;
         }
@@ -111,7 +110,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         if (this.chunkSize === 0) {
             this.dc.send(encryptedBytes);
         } else {
-            const chunker = new Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+            const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
             for (let chunk of chunker) {
                 this.dc.send(chunk);
             }
@@ -179,7 +178,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             fakeEvent[x] = realEvent[x];
         }
 
-        const box = Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
+        const box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
 
         // Validate nonce
         try {
@@ -192,7 +191,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             this.close();
 
             // Close the signaling as well
-            this.task.close(CloseCode.ProtocolError);
+            this.task.close(saltyrtcClient.CloseCode.ProtocolError);
 
             return;
         }
