@@ -29,7 +29,6 @@ declare namespace saltyrtc.tasks.webrtc {
         sendCandidates(candidates: RTCIceCandidateInit[]): void;
         handover(pc: RTCPeerConnection): boolean;
         wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel;
-        sendClose(): void;
 
         // Events
         on(event: string | string[], handler: saltyrtc.SaltyRTCEventHandler): void;
