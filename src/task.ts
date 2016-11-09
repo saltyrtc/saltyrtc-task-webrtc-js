@@ -343,7 +343,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 }
             });
         } catch (e) {
-            if (e instanceof saltyrtcClient.SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send offer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -364,7 +364,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 }
             });
         } catch (e) {
-            if (e instanceof saltyrtcClient.SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send answer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -395,7 +395,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                     'candidates': this.candidates
                 });
             } catch (e) {
-                if (e instanceof saltyrtcClient.SignalingError) {
+                if (e.name === 'SignalingError') {
                     console.error(this.logTag, 'Could not send candidates:', e.message);
                     this.signaling.resetConnection(e.closeCode);
                 }
@@ -496,7 +496,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         try {
             this.signaling.sendTaskMessage({'type': 'handover'});
         } catch (e) {
-            if (e instanceof saltyrtcClient.SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send handover message', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
