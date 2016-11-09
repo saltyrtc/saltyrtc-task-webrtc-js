@@ -46,7 +46,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Exclude list
     private exclude: Set<number> = new Set();
-    private dcId;
+    private sdcId;
 
     // Effective max packet size
     private maxPacketSize: number;
@@ -110,11 +110,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         }
         for (let i = 0; i <= 65535; i++) {
             if (!this.exclude.has(i)) {
-                this.dcId = i;
+                this.sdcId = i;
                 break;
             }
         }
-        if (this.dcId === undefined) {
+        if (this.sdcId === undefined) {
             throw new Error('Exclude list is too big, no free data channel id can be found');
         }
     }
@@ -435,7 +435,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         }
 
         // Make sure the dc id is set
-        if (this.dcId === undefined || this.dcId === null) {
+        if (this.sdcId === undefined || this.sdcId === null) {
             console.error(this.logTag, 'Data channel id not set');
             this.signaling.resetConnection(CloseCode.InternalError);
             throw new Error('Data channel id not set');
@@ -443,7 +443,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         // Configure new data channel
         const dc: RTCDataChannel = pc.createDataChannel(WebRTCTask.DC_LABEL, {
-            id: this.dcId,
+            id: this.sdcId,
             negotiated: true,
             ordered: true,
             protocol: WebRTCTask.PROTOCOL_NAME,
