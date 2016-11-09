@@ -93,8 +93,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
-        this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
-        this.processHandover(data[WebRTCTask.FIELD_HANDOVER]);
+        this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE] as number);
+        this.processHandover(data[WebRTCTask.FIELD_HANDOVER] as boolean);
         this.signaling = signaling;
         this.initialized = true;
     }
@@ -114,7 +114,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 break;
             }
         }
-        if (this.sdcId === undefined) {
+        if (this.sdcId === undefined && this.doHandover === true) {
             throw new Error('Exclude list is too big, no free data channel id can be found');
         }
     }
