@@ -58,7 +58,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private signaling: saltyrtc.Signaling;
 
     // Data channel
-    private sdc: saltyrtc.tasks.webrtc.SecureDataChannel;
+    private sdc: saltyrtc.tasks.webrtc.SecureDataChannel = null;
 
     // Events
     private eventRegistry: saltyrtc.EventRegistry = new EventRegistry();
@@ -502,7 +502,10 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     public close(reason: number): void {
         console.debug('Closing signaling data channel:', explainCloseCode(reason));
-        this.sdc.close();
+        if (this.sdc !== null) {
+            this.sdc.close();
+        }
+        this.sdc = null;
     }
 
     /**
