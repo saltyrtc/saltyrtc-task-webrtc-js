@@ -355,6 +355,7 @@ export default () => { describe('Integration Tests', function() {
                 return new Promise((resolve) => {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         // The receiver should get encrypted data.
+                        e.channel.binaryType = 'arraybuffer';
                         e.channel.onmessage = (e: MessageEvent) => {
                             expect(new Uint8Array(e.data)).not.toEqual(new Uint16Array([1, 1337, 9]));
                             expect(e.data.byteLength).toEqual(9 + 24 + 16 + 3);
