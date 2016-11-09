@@ -12,6 +12,14 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.4.0 (2016-11-09)
+
+- [changed] Update saltyrtc-client to latest version
+- [changed] Make handover optional (#1)
+- [changed] Use type declarations from npm instead of bundling them
+- [removed] Remove sendClose method (#7)
+- [fixed] Properly catch `SignalingError`
+
 ### v0.3.2 (2016-11-07)
 
 - [fixed] Fix bug in data handling in `SecureDataChannel.onmessage`

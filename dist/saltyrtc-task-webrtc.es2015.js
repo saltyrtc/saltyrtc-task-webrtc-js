@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.3.2
+ * saltyrtc-task-webrtc v0.4.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -28,9 +28,6 @@
  */
 'use strict';
 
-import { Box, CloseCode, CombinedSequencePair, Cookie, CookiePair, EventRegistry, SignalingError, explainCloseCode } from 'saltyrtc-client';
-import { Chunker, Unchunker } from 'chunked-dc';
-
 class DataChannelNonce {
     constructor(cookie, channelId, overflow, sequenceNumber) {
         this._cookie = cookie;
@@ -48,7 +45,7 @@ class DataChannelNonce {
             throw 'bad-packet-length';
         }
         const view = new DataView(packet);
-        const cookie = new Cookie(new Uint8Array(packet, 0, 16));
+        const cookie = new saltyrtcClient.Cookie(new Uint8Array(packet, 0, 16));
         const channelId = view.getUint16(16);
         const overflow = view.getUint16(18);
         const sequenceNumber = view.getUint32(20);
@@ -105,7 +102,7 @@ class SecureDataChannel {
             for (let x in realEvent) {
                 fakeEvent[x] = realEvent[x];
             }
-            const box = Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
+            const box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
             try {
                 this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
             }
@@ -113,7 +110,7 @@ class SecureDataChannel {
                 console.error(this.logTag, 'Invalid nonce:', e);
                 console.error(this.logTag, 'Closing data channel');
                 this.close();
-                this.task.close(CloseCode.ProtocolError);
+                this.task.close(saltyrtcClient.CloseCode.ProtocolError);
                 return;
             }
             const decrypted = this.task.getSignaling().decryptFromPeer(box);
@@ -126,8 +123,8 @@ class SecureDataChannel {
         }
         this.dc = dc;
         this.task = task;
-        this.cookiePair = new CookiePair();
-        this.csnPair = new CombinedSequencePair();
+        this.cookiePair = new saltyrtcClient.CookiePair();
+        this.csnPair = new saltyrtcClient.CombinedSequencePair();
         this.chunkSize = this.task.getMaxPacketSize();
         if (this.chunkSize === null) {
             throw new Error('Could not determine max chunk size');
@@ -136,7 +133,7 @@ class SecureDataChannel {
             this.dc.onmessage = (event) => this.onEncryptedMessage(event.data, [event]);
         }
         else {
-            this.unchunker = new Unchunker();
+            this.unchunker = new chunkedDc.Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
             this.dc.onmessage = this.onChunk;
         }
@@ -179,7 +176,7 @@ class SecureDataChannel {
             this.dc.send(encryptedBytes);
         }
         else {
-            const chunker = new Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+            const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
             for (let chunk of chunker) {
                 this.dc.send(chunk);
             }
@@ -255,12 +252,15 @@ SecureDataChannel.CHUNK_COUNT_GC = 32;
 SecureDataChannel.CHUNK_MAX_AGE = 60000;
 
 class WebRTCTask {
-    constructor() {
+    constructor(handover = true) {
         this.initialized = false;
         this.exclude = new Set();
-        this.eventRegistry = new EventRegistry();
+        this.doHandover = true;
+        this.sdc = null;
+        this.eventRegistry = new saltyrtcClient.EventRegistry();
         this.candidates = [];
         this.sendCandidatesTimeout = null;
+        this.doHandover = handover;
     }
     get logTag() {
         if (this.signaling === null || this.signaling === undefined) {
@@ -271,6 +271,7 @@ class WebRTCTask {
     init(signaling, data) {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE]);
         this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
+        this.processHandover(data[WebRTCTask.FIELD_HANDOVER]);
         this.signaling = signaling;
         this.initialized = true;
     }
@@ -280,11 +281,11 @@ class WebRTCTask {
         }
         for (let i = 0; i <= 65535; i++) {
             if (!this.exclude.has(i)) {
-                this.dcId = i;
+                this.sdcId = i;
                 break;
             }
         }
-        if (this.dcId === undefined) {
+        if (this.sdcId === undefined && this.doHandover === true) {
             throw new Error('Exclude list is too big, no free data channel id can be found');
         }
     }
@@ -303,6 +304,11 @@ class WebRTCTask {
         }
         else {
             this.maxPacketSize = Math.min(maxPacketSize, WebRTCTask.MAX_PACKET_SIZE);
+        }
+    }
+    processHandover(handover) {
+        if (handover === false) {
+            this.doHandover = false;
         }
     }
     onPeerHandshakeDone() {
@@ -326,6 +332,11 @@ class WebRTCTask {
                 this.emit({ type: 'candidates', data: message['candidates'] });
                 break;
             case 'handover':
+                if (this.doHandover === false) {
+                    console.error(this.logTag, 'Received unexpected handover message from peer');
+                    this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
+                    break;
+                }
                 if (this.signaling.handoverState.local === false) {
                     this.sendHandover();
                 }
@@ -387,10 +398,10 @@ class WebRTCTask {
     }
     sendSignalingMessage(payload) {
         if (this.signaling.getState() != 'task') {
-            throw new SignalingError(CloseCode.ProtocolError, 'Could not send signaling message: Signaling state is not open.');
+            throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, 'Could not send signaling message: Signaling state is not open.');
         }
         if (this.signaling.handoverState.local === false) {
-            throw new SignalingError(CloseCode.ProtocolError, 'Could not send signaling message: Handover hasn\'t happened yet.');
+            throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, 'Could not send signaling message: Handover hasn\'t happened yet.');
         }
         this.sdc.send(payload);
     }
@@ -410,6 +421,7 @@ class WebRTCTask {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
         data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = WebRTCTask.MAX_PACKET_SIZE;
+        data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
         return data;
     }
     getSignaling() {
@@ -427,7 +439,7 @@ class WebRTCTask {
             });
         }
         catch (e) {
-            if (e instanceof SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send offer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -445,7 +457,7 @@ class WebRTCTask {
             });
         }
         catch (e) {
-            if (e instanceof SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send answer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -466,7 +478,7 @@ class WebRTCTask {
                 });
             }
             catch (e) {
-                if (e instanceof SignalingError) {
+                if (e.name === 'SignalingError') {
                     console.error(this.logTag, 'Could not send candidates:', e.message);
                     this.signaling.resetConnection(e.closeCode);
                 }
@@ -482,17 +494,21 @@ class WebRTCTask {
     }
     handover(pc) {
         console.debug(this.logTag, 'Initiate handover');
+        if (this.doHandover === false) {
+            console.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
+            return false;
+        }
         if (this.signaling.handoverState.any) {
             console.error(this.logTag, 'Handover already in progress or finished');
-            return;
+            return false;
         }
-        if (this.dcId === undefined || this.dcId === null) {
+        if (this.sdcId === undefined || this.sdcId === null) {
             console.error(this.logTag, 'Data channel id not set');
-            this.signaling.resetConnection(CloseCode.InternalError);
+            this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
             throw new Error('Data channel id not set');
         }
         const dc = pc.createDataChannel(WebRTCTask.DC_LABEL, {
-            id: this.dcId,
+            id: this.sdcId,
             negotiated: true,
             ordered: true,
             protocol: WebRTCTask.PROTOCOL_NAME,
@@ -517,6 +533,7 @@ class WebRTCTask {
             let decryptedData = new Uint8Array(ev.data);
             this.signaling.onSignalingPeerMessage(decryptedData);
         };
+        return true;
     }
     sendHandover() {
         console.debug(this.logTag, 'Sending handover');
@@ -524,7 +541,7 @@ class WebRTCTask {
             this.signaling.sendTaskMessage({ 'type': 'handover' });
         }
         catch (e) {
-            if (e instanceof SignalingError) {
+            if (e.name === 'SignalingError') {
                 console.error(this.logTag, 'Could not send handover message', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
@@ -538,13 +555,12 @@ class WebRTCTask {
         console.debug(this.logTag, "Wrapping data channel", dc.id);
         return new SecureDataChannel(dc, this);
     }
-    sendClose() {
-        this.close(CloseCode.goingAway);
-        this.signaling.resetConnection(CloseCode.goingAway);
-    }
     close(reason) {
-        console.debug('Closing signaling data channel:', explainCloseCode(reason));
-        this.sdc.close();
+        console.debug('Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
+        if (this.sdc !== null) {
+            this.sdc.close();
+        }
+        this.sdc = null;
     }
     on(event, handler) {
         this.eventRegistry.register(event, handler);
@@ -588,6 +604,7 @@ WebRTCTask.PROTOCOL_NAME = 'v0.webrtc.tasks.saltyrtc.org';
 WebRTCTask.MAX_PACKET_SIZE = 16384;
 WebRTCTask.FIELD_EXCLUDE = 'exclude';
 WebRTCTask.FIELD_MAX_PACKET_SIZE = 'max_packet_size';
+WebRTCTask.FIELD_HANDOVER = 'handover';
 WebRTCTask.DC_LABEL = 'saltyrtc-signaling';
 WebRTCTask.CANDIDATE_BUFFERING_MS = 5;
 
