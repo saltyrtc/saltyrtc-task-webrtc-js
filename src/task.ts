@@ -511,7 +511,6 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     public close(reason: number): void {
         console.debug('Closing signaling data channel:', explainCloseCode(reason));
         this.sdc.close();
-        // TODO: Is this correct?
     }
 
     /**
