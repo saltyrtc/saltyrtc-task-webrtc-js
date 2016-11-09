@@ -86,7 +86,12 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         this.doHandover = handover;
     }
 
-    public init(signaling: saltyrtc.Signaling, data: Object): void {
+    /**
+     * Initialize the task with the task data from the peer.
+     *
+     * This method should only be called by the signalig class, not by the end user!
+     */
+    init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
         this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
         this.processHandover(data[WebRTCTask.FIELD_HANDOVER]);
@@ -146,7 +151,12 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         }
     }
 
-    public onPeerHandshakeDone(): void {
+    /**
+     * Used by the signaling class to notify task that the peer handshake is over.
+     *
+     * This method should only be called by the signalig class, not by the end user!
+     */
+    onPeerHandshakeDone(): void {
         // Do nothing.
         // The user should wait for a signaling state change to TASK.
         // Then he can start by sending an offer.
@@ -154,8 +164,10 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     /**
      * Handle incoming task messages.
+     *
+     * This method should only be called by the signalig class, not by the end user!
      */
-    public onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
+    onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
         console.debug('New task message arrived: ' + message.type);
         switch (message.type) {
             case 'offer':
@@ -251,11 +263,13 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Send a signaling message *through the data channel*.
      *
+     * This method should only be called by the signalig class, not by the end user!
+     *
      * @param payload Non-encrypted message. The message will be encrypted by
      *   the underlying secure data channel.
      * @throws SignalingError when signaling or handover state are not correct.
      */
-    public sendSignalingMessage(payload: Uint8Array) {
+    sendSignalingMessage(payload: Uint8Array) {
         if (this.signaling.getState() != 'task') {
             throw new SignalingError(CloseCode.ProtocolError,
                 'Could not send signaling message: Signaling state is not open.');
@@ -267,11 +281,19 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         this.sdc.send(payload);
     }
 
+    /**
+     * Return the task protocol name.
+     */
     public getName(): string {
         return WebRTCTask.PROTOCOL_NAME;
     }
 
-    public getSupportedMessageTypes(): string[] {
+    /**
+     * Return the list of supported message types.
+     *
+     * This method should only be called by the signalig class, not by the end user!
+     */
+    getSupportedMessageTypes(): string[] {
         return ['offer', 'answer', 'candidates', 'handover'];
     }
 
@@ -285,7 +307,12 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         return null;
     }
 
-    public getData(): Object {
+    /**
+     * Return the task data used for negotiation in the `auth` message.
+     *
+     * This method should only be called by the signalig class, not by the end user!
+     */
+    getData(): Object {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
         data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = WebRTCTask.MAX_PACKET_SIZE;
@@ -295,8 +322,10 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     /**
      * Return a reference to the signaling instance.
+     *
+     * This method should only be called by the signalig class, not by the end user!
      */
-    public getSignaling(): saltyrtc.Signaling {
+    getSignaling(): saltyrtc.Signaling {
         return this.signaling;
     }
 
@@ -496,7 +525,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Close the data channel.
+     * Close the signaling data channel.
      *
      * @param reason The close code.
      */
