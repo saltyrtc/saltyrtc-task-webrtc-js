@@ -27,7 +27,7 @@ declare namespace saltyrtc.tasks.webrtc {
         sendAnswer(answer: RTCSessionDescriptionInit): void;
         sendCandidate(candidate: RTCIceCandidateInit): void;
         sendCandidates(candidates: RTCIceCandidateInit[]): void;
-        handover(pc: RTCPeerConnection): void;
+        handover(pc: RTCPeerConnection): boolean;
         wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel;
         sendClose(): void;
 
@@ -38,7 +38,7 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     interface WebRTCTaskStatic {
-        new(): WebRTCTask;
+        new(handover?: boolean): WebRTCTask;
     }
 
     type Offer = RTCSessionDescriptionInit;

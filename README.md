@@ -22,6 +22,31 @@ You can install this library via `npm`:
 
 ## Usage
 
+When creating the task instance, you can specify whether or not a handover to a secure data channel is desired.
+
+    let task = new WebRTCTask(true);
+
+If you don't specify any value, handover defaults to `true`.
+
+To send offers, answers and candidates, use the following task methods:
+
+* `.sendOffer(offer: RTCSessionDescriptionInit): void`
+* `.sendAnswer(answer: RTCSessionDescriptionInit): void`
+* `.sendCandidate(candidate: RTCIceCandidateInit): void`
+* `.sendCandidates(candidates: RTCIceCandidateInit[]): void`
+
+The handover can be initiated using the handover method:
+
+    let started = task.handover(peerConnection);
+
+You can register and deregister event handlers with the `on`, `once` and `off` methods:
+
+    task.on('candidates', (e) => {
+        for (let candidateInit of e.data) {
+            pc.addIceCandidate(candidateInit);
+        }
+    });
+
 The following events are available:
 
 * `offer(saltyrtc.tasks.webrtc.Offer)`: An offer message was received.

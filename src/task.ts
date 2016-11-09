@@ -36,6 +36,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     // Data fields
     private static FIELD_EXCLUDE = 'exclude';
     private static FIELD_MAX_PACKET_SIZE = 'max_packet_size';
+    private static FIELD_HANDOVER = 'handover';
 
     // Other constants
     private static DC_LABEL = 'saltyrtc-signaling';
@@ -49,6 +50,9 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Effective max packet size
     private maxPacketSize: number;
+
+    // Whether to hand over
+    private doHandover = true;
 
     // Signaling
     private signaling: saltyrtc.Signaling;
@@ -72,9 +76,20 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         return 'SaltyRTC.WebRTC.' + this.signaling.role + ':';
     }
 
+    /**
+     * Create a new task instance.
+     *
+     * @param handover Set this parameter to `false` if you want to disable
+     *                 the signaling handover to a secure data channel.
+     */
+    constructor(handover: boolean = true) {
+        this.doHandover = handover;
+    }
+
     public init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
         this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
+        this.processHandover(data[WebRTCTask.FIELD_HANDOVER]);
         this.signaling = signaling;
         this.initialized = true;
     }
@@ -122,6 +137,15 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         }
     }
 
+    /**
+     * Process the handover field from the peer.
+     */
+    private processHandover(handover: boolean): void {
+        if (handover === false) {
+            this.doHandover = false;
+        }
+    }
+
     public onPeerHandshakeDone(): void {
         // Do nothing.
         // The user should wait for a signaling state change to TASK.
@@ -147,6 +171,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 this.emit({type: 'candidates', data: message['candidates']});
                 break;
             case 'handover':
+                if (this.doHandover === false) {
+                    console.error(this.logTag, 'Received unexpected handover message from peer');
+                    this.signaling.resetConnection(CloseCode.ProtocolError);
+                    break;
+                }
                 if (this.signaling.handoverState.local === false) {
                     this.sendHandover();
                 }
@@ -260,6 +289,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
         data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = WebRTCTask.MAX_PACKET_SIZE;
+        data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
         return data;
     }
 
@@ -355,16 +385,24 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Do the handover from WebSocket to WebRTC data channel on the specified peer connection.
      *
+     * Return a boolean indicating whether the handover has been initiated.
+     *
      * This operation is asynchronous. To get notified when the handover is finished, subscribe to
      * the SaltyRTC `handover` event.
      */
-    public handover(pc: RTCPeerConnection): void {
+    public handover(pc: RTCPeerConnection): boolean {
         console.debug(this.logTag, 'Initiate handover');
+
+        // Make sure this is intended
+        if (this.doHandover === false) {
+            console.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
+            return false;
+        }
 
         // Make sure handover hasn't already happened
         if (this.signaling.handoverState.any) {
             console.error(this.logTag, 'Handover already in progress or finished');
-            return;
+            return false;
         }
 
         // Make sure the dc id is set
@@ -414,7 +452,9 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             // Pass decrypted incoming signaling messages to signaling class
             let decryptedData = new Uint8Array(ev.data);
             this.signaling.onSignalingPeerMessage(decryptedData);
-        }
+        };
+
+        return true;
     }
 
     /**

@@ -166,7 +166,7 @@ export default () => { describe('Integration Tests', function() {
         /**
          * Create two peer connections and do the handshake.
          */
-        async function setupPeerConnection(): Promise<{initiator: RTCPeerConnection, responder: RTCPeerConnection}> {
+        async function setupPeerConnection(doHandover=true): Promise<{initiator: RTCPeerConnection, responder: RTCPeerConnection}> {
             // Create peer connections
             const initiatorConn = new RTCPeerConnection();
             const responderConn = new RTCPeerConnection();
@@ -214,8 +214,11 @@ export default () => { describe('Integration Tests', function() {
                     this.responder.once('handover', handoverHandler);
                 });
             };
-            await handover();
-            console.info('Handover done.');
+
+            if (doHandover) {
+                await handover();
+                console.info('Handover done.');
+            }
 
             return {
                 'initiator': initiatorConn,
@@ -343,7 +346,7 @@ export default () => { describe('Integration Tests', function() {
                     dc.binaryType = 'arraybuffer';
                     dc.send('bonjour');
                 });
-            }
+            };
             await testUnencrypted();
             console.info('Unencrypted test done');
 
@@ -388,9 +391,22 @@ export default () => { describe('Integration Tests', function() {
                         sdpMLineIndex: this.lastCandidate.sdpMLineIndex,
                     });
                 });
-            }
+            };
             await candidateTest();
 
+            done();
+        });
+
+        it('cannot do handover if disabled via constructor', async (done) => {
+            this.responderTask = new WebRTCTask(false);
+            this.responder = new SaltyRTCBuilder()
+                .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                .withKeyStore(new KeyStore())
+                .initiatorInfo(this.initiator.permanentKeyBytes, this.initiator.authTokenBytes)
+                .usingTasks([this.responderTask])
+                .asResponder() as saltyrtc.SaltyRTC;
+            await setupPeerConnection.bind(this)(false);
+            expect(this.responderTask.handover()).toEqual(false);
             done();
         });
     });
