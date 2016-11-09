@@ -496,14 +496,6 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Send a 'close' message to the peer and close the connection.
-     */
-    public sendClose(): void {
-        this.close(CloseCode.goingAway);
-        this.signaling.resetConnection(CloseCode.goingAway);
-    }
-
-    /**
      * Close the data channel.
      *
      * @param reason The close code.
