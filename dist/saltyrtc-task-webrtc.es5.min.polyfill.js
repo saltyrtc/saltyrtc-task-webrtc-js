@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.4.0
+ * saltyrtc-task-webrtc v0.5.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
