@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.5.2 (2016-12-15)
+
+- [fixed] Fix typings for WebRTCTask constructor
+
 ### v0.5.1 (2016-12-15)
 
 - [added] Make max packet size configurable (#8)
