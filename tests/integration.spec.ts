@@ -410,6 +410,53 @@ export default () => { describe('Integration Tests', function() {
             expect(this.responderTask.handover()).toEqual(false);
             done();
         });
+
+        it('can safely increase the chunk size', async (done) => {
+            this.initiatorTask = new WebRTCTask(true, 65536);
+            this.initiator = new SaltyRTCBuilder()
+                .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                .withKeyStore(new KeyStore())
+                .usingTasks([this.initiatorTask])
+                .asInitiator() as saltyrtc.SaltyRTC;
+            this.responderTask = new WebRTCTask(true, 65536);
+            this.responder = new SaltyRTCBuilder()
+                .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                .withKeyStore(new KeyStore())
+                .initiatorInfo(this.initiator.permanentKeyBytes, this.initiator.authTokenBytes)
+                .usingTasks([this.responderTask])
+                .asResponder() as saltyrtc.SaltyRTC;
+
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            // Wrap data channel
+            const data = nacl.randomBytes(60000); // 60'000 bytes of random data
+            let testEncrypted = () => {
+                return new Promise((resolve) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        // The receiver should get encrypted data.
+                        e.channel.binaryType = 'arraybuffer';
+                        e.channel.onmessage = (e: MessageEvent) => {
+                            const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
+                                                   16 /* authenticator */ + 60000 /* data */;
+                            expect(e.data.byteLength).toEqual(expectedLength);
+                            //expect(e.data.byteLength).toEqual(9 + 24 + 16 + 3);
+                            resolve();
+                        };
+                    };
+                    let dc = connections.initiator.createDataChannel('dc');
+                    dc.binaryType = 'arraybuffer';
+                    let safedc = this.initiatorTask.wrapDataChannel(dc);
+                    safedc.send(data);
+                });
+            };
+            await testEncrypted();
+            console.info('Data channel test with chunk size 65536 done');
+
+            done();
+        });
     });
 
 }); }
