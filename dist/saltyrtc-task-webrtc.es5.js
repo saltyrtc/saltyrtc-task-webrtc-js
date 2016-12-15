@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.5.0
+ * saltyrtc-task-webrtc v0.5.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -626,6 +626,7 @@ SecureDataChannel.CHUNK_MAX_AGE = 60000;
 var WebRTCTask = function () {
     function WebRTCTask() {
         var handover = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+        var maxPacketSize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : WebRTCTask.DEFAULT_MAX_PACKET_SIZE;
         classCallCheck(this, WebRTCTask);
 
         this.initialized = false;
@@ -636,6 +637,7 @@ var WebRTCTask = function () {
         this.candidates = [];
         this.sendCandidatesTimeout = null;
         this.doHandover = handover;
+        this.requestedMaxPacketSize = maxPacketSize;
     }
 
     createClass(WebRTCTask, [{
@@ -694,13 +696,14 @@ var WebRTCTask = function () {
             if (maxPacketSize < 0) {
                 throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
             }
-            if (maxPacketSize === 0 && WebRTCTask.MAX_PACKET_SIZE === 0) {
-                this.maxPacketSize = 0;
-            } else if (maxPacketSize === 0 || WebRTCTask.MAX_PACKET_SIZE === 0) {
-                this.maxPacketSize = Math.max(maxPacketSize, WebRTCTask.MAX_PACKET_SIZE);
+            if (maxPacketSize === 0 && this.requestedMaxPacketSize === 0) {
+                this.negotiatedMaxPacketSize = 0;
+            } else if (maxPacketSize === 0 || this.requestedMaxPacketSize === 0) {
+                this.negotiatedMaxPacketSize = Math.max(maxPacketSize, this.requestedMaxPacketSize);
             } else {
-                this.maxPacketSize = Math.min(maxPacketSize, WebRTCTask.MAX_PACKET_SIZE);
+                this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
             }
+            console.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize, 'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
         }
     }, {
         key: 'processHandover',
@@ -847,7 +850,7 @@ var WebRTCTask = function () {
         key: 'getMaxPacketSize',
         value: function getMaxPacketSize() {
             if (this.initialized === true) {
-                return this.maxPacketSize;
+                return this.negotiatedMaxPacketSize;
             }
             return null;
         }
@@ -856,7 +859,7 @@ var WebRTCTask = function () {
         value: function getData() {
             var data = {};
             data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
-            data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = WebRTCTask.MAX_PACKET_SIZE;
+            data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.requestedMaxPacketSize;
             data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
             return data;
         }
@@ -1097,7 +1100,7 @@ var WebRTCTask = function () {
 }();
 
 WebRTCTask.PROTOCOL_NAME = 'v0.webrtc.tasks.saltyrtc.org';
-WebRTCTask.MAX_PACKET_SIZE = 16384;
+WebRTCTask.DEFAULT_MAX_PACKET_SIZE = 16384;
 WebRTCTask.FIELD_EXCLUDE = 'exclude';
 WebRTCTask.FIELD_MAX_PACKET_SIZE = 'max_packet_size';
 WebRTCTask.FIELD_HANDOVER = 'handover';
