@@ -143,6 +143,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         } else {
             this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
         }
+        console.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize,
+                      'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
     }
 
     /**
