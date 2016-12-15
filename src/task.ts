@@ -31,7 +31,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Constants as defined by the specification
     private static PROTOCOL_NAME = 'v0.webrtc.tasks.saltyrtc.org';
-    private static MAX_PACKET_SIZE = 16384;
+    private static DEFAULT_MAX_PACKET_SIZE = 16384;
 
     // Data fields
     private static FIELD_EXCLUDE = 'exclude';
@@ -49,7 +49,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private sdcId;
 
     // Effective max packet size
-    private maxPacketSize: number;
+    private requestedMaxPacketSize: number;
+    private negotiatedMaxPacketSize: number;
 
     // Whether to hand over
     private doHandover = true;
@@ -81,9 +82,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      *
      * @param handover Set this parameter to `false` if you want to disable
      *                 the signaling handover to a secure data channel.
+     * @param maxPacketSize The max packet size in bytes for a DataChannel chunk.
      */
-    constructor(handover: boolean = true) {
+    constructor(handover: boolean = true, maxPacketSize: number = WebRTCTask.DEFAULT_MAX_PACKET_SIZE) {
         this.doHandover = handover;
+        this.requestedMaxPacketSize = maxPacketSize;
     }
 
     /**
@@ -133,13 +136,15 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         if (maxPacketSize < 0) {
             throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
         }
-        if (maxPacketSize === 0 && WebRTCTask.MAX_PACKET_SIZE === 0) {
-            this.maxPacketSize = 0;
-        } else if (maxPacketSize === 0 || WebRTCTask.MAX_PACKET_SIZE === 0) {
-            this.maxPacketSize = Math.max(maxPacketSize, WebRTCTask.MAX_PACKET_SIZE);
+        if (maxPacketSize === 0 && this.requestedMaxPacketSize === 0) {
+            this.negotiatedMaxPacketSize = 0;
+        } else if (maxPacketSize === 0 || this.requestedMaxPacketSize === 0) {
+            this.negotiatedMaxPacketSize = Math.max(maxPacketSize, this.requestedMaxPacketSize);
         } else {
-            this.maxPacketSize = Math.min(maxPacketSize, WebRTCTask.MAX_PACKET_SIZE);
+            this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
         }
+        console.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize,
+                      'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
     }
 
     /**
@@ -298,11 +303,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Return the max packet size, or `null` if the task has not yet been initialized.
+     * Return the negotiated max packet size, or `null` if the task has not yet been initialized.
      */
     public getMaxPacketSize(): number {
         if (this.initialized === true) {
-            return this.maxPacketSize;
+            return this.negotiatedMaxPacketSize;
         }
         return null;
     }
@@ -315,7 +320,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     getData(): Object {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
-        data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = WebRTCTask.MAX_PACKET_SIZE;
+        data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.requestedMaxPacketSize;
         data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
         return data;
     }
