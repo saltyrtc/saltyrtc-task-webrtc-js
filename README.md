@@ -26,7 +26,11 @@ When creating the task instance, you can specify whether or not a handover to a 
 
     let task = new WebRTCTask(true);
 
-If you don't specify any value, handover defaults to `true`.
+You can also specify the max DataChannel chunk size:
+
+    let task = new WebRTCTask(true, 65536);
+
+If you don't specify any values, handover defaults to `true` and the chunk size defaults to `16384`.
 
 To send offers, answers and candidates, use the following task methods:
 
