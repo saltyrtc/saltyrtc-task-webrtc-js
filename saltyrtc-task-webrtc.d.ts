@@ -37,7 +37,7 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     interface WebRTCTaskStatic {
-        new(handover?: boolean): WebRTCTask;
+        new(handover?: boolean, maxPacketSize?: number): WebRTCTask;
     }
 
     type Offer = RTCSessionDescriptionInit;
