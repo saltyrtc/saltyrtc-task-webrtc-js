@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.9.0
+ * saltyrtc-task-webrtc v0.9.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -342,7 +342,7 @@ var SecureDataChannel = function () {
 
         classCallCheck(this, SecureDataChannel);
 
-        this.logTag = 'SecureDataChannel:';
+        this.logTag = '[SaltyRTC.SecureDataChannel]';
         this.messageNumber = 0;
         this.chunkCount = 0;
         this.onChunk = function (event) {
@@ -718,7 +718,7 @@ var WebRTCTask = function () {
     }, {
         key: 'onTaskMessage',
         value: function onTaskMessage(message) {
-            console.debug('New task message arrived: ' + message.type);
+            console.debug(this.logTag, 'New task message arrived: ' + message.type);
             switch (message.type) {
                 case 'offer':
                     if (this.validateOffer(message) !== true) return;
@@ -743,11 +743,11 @@ var WebRTCTask = function () {
                     }
                     this.signaling.handoverState.peer = true;
                     if (this.signaling.handoverState.both) {
-                        console.info('Handover to data channel finished');
+                        console.info(this.logTag, 'Handover to data channel finished');
                     }
                     break;
                 default:
-                    console.error('Received message with unknown type:', message.type);
+                    console.error(this.logTag, 'Received message with unknown type:', message.type);
             }
         }
     }, {
@@ -1013,7 +1013,7 @@ var WebRTCTask = function () {
     }, {
         key: 'close',
         value: function close(reason) {
-            console.debug('Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
+            console.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
             if (this.sdc !== null) {
                 this.sdc.close();
             }
@@ -1061,7 +1061,7 @@ var WebRTCTask = function () {
                     try {
                         this.callHandler(handler, event);
                     } catch (e) {
-                        console.error('SaltyRTC: Unhandled exception in', event.type, 'handler:', e);
+                        console.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
                     }
                 }
             } catch (err) {
@@ -1091,9 +1091,9 @@ var WebRTCTask = function () {
         key: 'logTag',
         get: function get() {
             if (this.signaling === null || this.signaling === undefined) {
-                return 'SaltyRTC.WebRTC:';
+                return '[SaltyRTC.WebRTC]';
             }
-            return 'SaltyRTC.WebRTC.' + this.signaling.role + ':';
+            return '[SaltyRTC.WebRTC.' + this.signaling.role + ']';
         }
     }]);
     return WebRTCTask;

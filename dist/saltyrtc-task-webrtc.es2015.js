@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.9.0
+ * saltyrtc-task-webrtc v0.9.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -69,7 +69,7 @@ DataChannelNonce.TOTAL_LENGTH = 24;
 
 class SecureDataChannel {
     constructor(dc, task) {
-        this.logTag = 'SecureDataChannel:';
+        this.logTag = '[SaltyRTC.SecureDataChannel]';
         this.messageNumber = 0;
         this.chunkCount = 0;
         this.onChunk = (event) => {
@@ -265,9 +265,9 @@ class WebRTCTask {
     }
     get logTag() {
         if (this.signaling === null || this.signaling === undefined) {
-            return 'SaltyRTC.WebRTC:';
+            return '[SaltyRTC.WebRTC]';
         }
-        return 'SaltyRTC.WebRTC.' + this.signaling.role + ':';
+        return '[SaltyRTC.WebRTC.' + this.signaling.role + ']';
     }
     init(signaling, data) {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE]);
@@ -316,7 +316,7 @@ class WebRTCTask {
     onPeerHandshakeDone() {
     }
     onTaskMessage(message) {
-        console.debug('New task message arrived: ' + message.type);
+        console.debug(this.logTag, 'New task message arrived: ' + message.type);
         switch (message.type) {
             case 'offer':
                 if (this.validateOffer(message) !== true)
@@ -344,11 +344,11 @@ class WebRTCTask {
                 }
                 this.signaling.handoverState.peer = true;
                 if (this.signaling.handoverState.both) {
-                    console.info('Handover to data channel finished');
+                    console.info(this.logTag, 'Handover to data channel finished');
                 }
                 break;
             default:
-                console.error('Received message with unknown type:', message.type);
+                console.error(this.logTag, 'Received message with unknown type:', message.type);
         }
     }
     validateOffer(message) {
@@ -558,7 +558,7 @@ class WebRTCTask {
         return new SecureDataChannel(dc, this);
     }
     close(reason) {
-        console.debug('Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
+        console.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
         if (this.sdc !== null) {
             this.sdc.close();
         }
@@ -591,7 +591,7 @@ class WebRTCTask {
                 this.callHandler(handler, event);
             }
             catch (e) {
-                console.error('SaltyRTC: Unhandled exception in', event.type, 'handler:', e);
+                console.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
             }
         }
     }
