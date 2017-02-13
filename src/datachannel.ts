@@ -23,7 +23,7 @@ type MessageEventHandler = (event: MessageEvent) => void;
 export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChannel {
 
     // Logging
-    private logTag = 'SecureDataChannel:';
+    private logTag = '[SaltyRTC.SecureDataChannel]';
 
     // Wrapped data channel
     private dc: RTCDataChannel;
