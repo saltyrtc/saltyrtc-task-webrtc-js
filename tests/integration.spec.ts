@@ -442,7 +442,6 @@ export default () => { describe('Integration Tests', function() {
                             const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
                                                    16 /* authenticator */ + 60000 /* data */;
                             expect(e.data.byteLength).toEqual(expectedLength);
-                            //expect(e.data.byteLength).toEqual(9 + 24 + 16 + 3);
                             resolve();
                         };
                     };
@@ -457,6 +456,39 @@ export default () => { describe('Integration Tests', function() {
 
             done();
         });
+
+        it('can send large files', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testWithSize = (dataBytes) => {
+                return new Promise((resolve) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onmessage = (m: MessageEvent) => {
+                            expect(m.data.byteLength).toEqual(dataBytes);
+                            resolve();
+                        }
+                    };
+                    let dc = connections.initiator.createDataChannel('dc10m');
+                    dc.binaryType = 'arraybuffer';
+                    const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.send(nacl.randomBytes(dataBytes));
+                });
+            };
+
+            await testWithSize(1024 * 1024 * 20); // 20 MiB
+            console.info('20 MiB data sending test done');
+
+            await testWithSize(1024 * 1024 * 100); // 100 MiB
+            console.info('100 MiB data sending test done');
+
+            done();
+        }, 10000);
+
     });
 
 }); }
