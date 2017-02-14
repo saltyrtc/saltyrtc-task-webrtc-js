@@ -487,7 +487,7 @@ export default () => { describe('Integration Tests', function() {
             console.info('100 MiB data sending test done');
 
             done();
-        }, 10000);
+        }, 15000);
 
     });
 
