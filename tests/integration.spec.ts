@@ -476,16 +476,16 @@ export default () => { describe('Integration Tests', function() {
                     let dc = connections.initiator.createDataChannel('dc10m');
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
-                    console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
-                    wrapped.send(nacl.randomBytes(dataBytes));
+                    console.info('Sending', dataBytes / 1024 / 1024, 'MiB of data');
+                    wrapped.send(new Uint8Array(dataBytes));
                 });
             };
 
             await testWithSize(1024 * 1024 * 20); // 20 MiB
             console.info('20 MiB data sending test done');
 
-            await testWithSize(1024 * 1024 * 60); // 60 MiB
-            console.info('60 MiB data sending test done');
+            await testWithSize(1024 * 1024 * 80); // 80 MiB
+            console.info('80 MiB data sending test done');
 
             done();
         }, 10000);
