@@ -476,6 +476,7 @@ export default () => { describe('Integration Tests', function() {
                     let dc = connections.initiator.createDataChannel('dc10m');
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
             };
