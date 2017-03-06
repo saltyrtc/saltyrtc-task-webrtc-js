@@ -471,14 +471,20 @@ export default () => { describe('Integration Tests', function() {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         e.channel.binaryType = 'arraybuffer';
                         const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
                             resolve();
                         }
                     };
-                    let dc = connections.initiator.createDataChannel('dc10m');
+                    let dc = connections.initiator.createDataChannel('dc' + dataBytes);
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                    wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                    wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                     console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
@@ -505,6 +511,9 @@ export default () => { describe('Integration Tests', function() {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         e.channel.binaryType = 'arraybuffer';
                         const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
                             done += 1;
@@ -519,6 +528,9 @@ export default () => { describe('Integration Tests', function() {
                         let dc = connections.initiator.createDataChannel('dc' + i);
                         dc.binaryType = 'arraybuffer';
                         const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                         console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
                         wrapped.send(nacl.randomBytes(dataBytes));
                     }
