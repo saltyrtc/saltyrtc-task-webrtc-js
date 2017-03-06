@@ -39,6 +39,9 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     private chunkCount = 0;
     private unchunker: chunkedDc.Unchunker;
 
+    // Buffering
+    private bufferedAmountLowHandlers = new Set();
+
     // SaltyRTC
     private cookiePair: saltyrtc.CookiePair;
     private csnPair: saltyrtc.CombinedSequencePair;
@@ -54,6 +57,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         this.cookiePair = new saltyrtcClient.CookiePair();
         this.csnPair = new saltyrtcClient.CombinedSequencePair();
 
+        // Determine max chunk size
         this.chunkSize = this.task.getMaxPacketSize();
         if (this.chunkSize === null) {
             throw new Error('Could not determine max chunk size');
@@ -66,13 +70,37 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             this.unchunker = new chunkedDc.Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
             this.dc.onmessage = this.onChunk;
+            const defaultBufferedAmountLowThreshold = 1024 * 640; // 640 KiB
+            if (this.chunkSize > defaultBufferedAmountLowThreshold) {
+                this.dc.bufferedAmountLowThreshold = 2 * this.chunkSize;
+            } else {
+                this.dc.bufferedAmountLowThreshold = defaultBufferedAmountLowThreshold;
+            }
+            this.dc.onbufferedamountlow = (e: Event) => {
+                for (let handler of this.bufferedAmountLowHandlers) {
+                    handler(e);
+                }
+            };
         }
     }
 
     /**
-     * Encrypt and send a message through the data channel.
+     * Wait for the `bufferedAmountLowThreshold` event on the datachannel.
      */
-    public send(data: string|Blob|ArrayBuffer|ArrayBufferView): void {
+    private async bufferedAmountIsLow(): Promise<void> {
+        return new Promise<void>((resolve) => {
+            const handler = (e: Event) => {
+                this.bufferedAmountLowHandlers.delete(handler);
+                resolve();
+            };
+            this.bufferedAmountLowHandlers.add(handler);
+        });
+    }
+
+    /**
+     * Validate and encrypt input data.
+     */
+    private prepareSend(data: string|Blob|ArrayBuffer|ArrayBufferView):  Uint8Array {
         // Validate input data
         let buffer: ArrayBuffer;
         if (typeof data === 'string') {
@@ -105,6 +133,16 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         const box: saltyrtc.Box = this.encryptData(new Uint8Array(buffer));
         const encryptedBytes: Uint8Array = box.toUint8Array();
 
+        return encryptedBytes;
+    }
+
+    /**
+     * Encrypt and send a message through the data channel.
+     */
+    public send(data: string|Blob|ArrayBuffer|ArrayBufferView): void {
+        // Validate and encrypt
+        const encryptedBytes = this.prepareSend(data);
+
         // Split into chunks if desired and send
         if (this.chunkSize === 0) {
             this.dc.send(encryptedBytes);
@@ -112,6 +150,32 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
             for (let chunk of chunker) {
                 this.dc.send(chunk);
+            }
+        }
+    }
+
+    /**
+     * Encrypt and send a message through the data channel.
+     *
+     * This method should be preferred over the synchronous `send` method
+     * because it prevents overfilling the send buffer.
+     */
+    public async sendAsync(data: string|Blob|ArrayBuffer|ArrayBufferView): Promise<void> {
+        // Validate and encrypt
+        const encryptedBytes = this.prepareSend(data);
+
+        // Split into chunks if desired and send
+        if (this.chunkSize === 0) {
+            this.dc.send(encryptedBytes);
+        } else {
+            const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+            for (let chunk of chunker) {
+                if (this.dc.bufferedAmount < this.dc.bufferedAmountLowThreshold) {
+                    this.dc.send(chunk);
+                } else {
+                    await this.bufferedAmountIsLow();
+                    this.dc.send(chunk);
+                }
             }
         }
     }
