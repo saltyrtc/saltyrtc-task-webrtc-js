@@ -460,7 +460,7 @@ export default () => { describe('Integration Tests', function() {
             done();
         });
 
-        it('can send large files', async (done) => {
+        it('can send large files (serial)', async (done) => {
             let connections: {
                 initiator: RTCPeerConnection,
                 responder: RTCPeerConnection,
@@ -479,6 +479,7 @@ export default () => { describe('Integration Tests', function() {
                     let dc = connections.initiator.createDataChannel('dc10m');
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
             };
@@ -491,6 +492,43 @@ export default () => { describe('Integration Tests', function() {
 
             done();
         }, 20000);
+
+        it('can send large files (parallel)', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testParallel = (count: number, dataBytes: number) => {
+                return new Promise((resolve) => {
+                    let done = 0;
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onmessage = (m: MessageEvent) => {
+                            expect(m.data.byteLength).toEqual(dataBytes);
+                            done += 1;
+                            console.debug('Parallel test', done, 'done');
+                            if (done == count) {
+                                resolve();
+                            }
+                        }
+                    };
+                    for (let i = 0; i < count; i++) {
+                        console.debug('Starting parallel test', i);
+                        let dc = connections.initiator.createDataChannel('dc' + i);
+                        dc.binaryType = 'arraybuffer';
+                        const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                        console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
+                        wrapped.send(nacl.randomBytes(dataBytes));
+                    }
+                });
+            };
+            await testParallel(5, 20 * 1024 * 1024);
+            console.info('5x20 MiB data sending test done');
+
+            done();
+        }, 15000);
 
     });
 
