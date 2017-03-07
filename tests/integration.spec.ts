@@ -128,12 +128,18 @@ export default () => { describe('Integration Tests', function() {
             let logTag = role.charAt(0).toUpperCase() + role.slice(1) + ':';
             console.debug(logTag, 'Setting up ICE candidate handling');
             pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
-                if (e.candidate) {
+                if (e.candidate !== null) {
                     _this.lastCandidate = e.candidate;
                     task.sendCandidate({
                         candidate: e.candidate.candidate,
                         sdpMid: e.candidate.sdpMid,
                         sdpMLineIndex: e.candidate.sdpMLineIndex,
+                    });
+                } else {
+                    task.sendCandidate({
+                        candidate: null,
+                        sdpMid: null,
+                        sdpMLineIndex: null,
                     });
                 }
             };
