@@ -136,11 +136,7 @@ export default () => { describe('Integration Tests', function() {
                         sdpMLineIndex: e.candidate.sdpMLineIndex,
                     });
                 } else {
-                    task.sendCandidate({
-                        candidate: null,
-                        sdpMid: null,
-                        sdpMLineIndex: null,
-                    });
+                    task.sendCandidate(null);
                 }
             };
             pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
@@ -260,6 +256,7 @@ export default () => { describe('Integration Tests', function() {
             const candidates: saltyrtc.tasks.webrtc.Candidates = [
                 {'candidate': 'FOO', 'sdpMid': 'data', 'sdpMLineIndex': 0},
                 {'candidate': 'BAR', 'sdpMid': 'data', 'sdpMLineIndex': 1},
+                null,
             ];
 
             this.responderTask.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {

@@ -10,6 +10,10 @@
 
 declare namespace saltyrtc.tasks.webrtc {
 
+    type Offer = RTCSessionDescriptionInit;
+    type Answer = RTCSessionDescriptionInit;
+    type Candidate = RTCIceCandidateInit | null;
+
     interface SecureDataChannel extends RTCDataChannel {
         addEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
         removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
@@ -25,8 +29,8 @@ declare namespace saltyrtc.tasks.webrtc {
         getSignaling(): saltyrtc.Signaling;
         sendOffer(offer: RTCSessionDescriptionInit): void;
         sendAnswer(answer: RTCSessionDescriptionInit): void;
-        sendCandidate(candidate: RTCIceCandidateInit): void;
-        sendCandidates(candidates: RTCIceCandidateInit[]): void;
+        sendCandidate(candidate: Candidate): void;
+        sendCandidates(candidates: Candidate[]): void;
         handover(pc: RTCPeerConnection): boolean;
         wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel;
 
@@ -40,10 +44,6 @@ declare namespace saltyrtc.tasks.webrtc {
         new(handover?: boolean, maxPacketSize?: number): WebRTCTask;
     }
 
-    type Offer = RTCSessionDescriptionInit;
-    type Answer = RTCSessionDescriptionInit;
-    type Candidates = RTCIceCandidateInit[];
-
     interface OfferEvent extends saltyrtc.SaltyRTCEvent {
         data: Offer;
     }
@@ -51,7 +51,7 @@ declare namespace saltyrtc.tasks.webrtc {
         data: Answer;
     }
     interface CandidatesEvent extends saltyrtc.SaltyRTCEvent {
-        data: Candidates;
+        data: Candidate[];
     }
 }
 

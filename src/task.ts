@@ -66,7 +66,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Candidate buffering
     private static CANDIDATE_BUFFERING_MS = 5;
-    private candidates: RTCIceCandidateInit[] = [];
+    private candidates: saltyrtc.tasks.webrtc.Candidate[] = [];
     private sendCandidatesTimeout: number | null = null;
 
     // Log tag
@@ -249,17 +249,19 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             return false;
         }
         for (let candidate of message['candidates']) {
-            if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
-                return false;
-            }
-            if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
-                return false;
-            }
-            if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
-                return false;
+            if (candidate !== null) {
+                if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                    return false;
+                }
+                if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                    return false;
+                }
+                if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                    return false;
+                }
             }
         }
         return true;
@@ -379,14 +381,14 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Send a candidate to the peer.
      */
-    public sendCandidate(candidate: RTCIceCandidateInit): void {
+    public sendCandidate(candidate: saltyrtc.tasks.webrtc.Candidate): void {
         this.sendCandidates([candidate]);
     }
 
     /**
      * Send one or more candidates to the peer.
      */
-    public sendCandidates(candidates: RTCIceCandidateInit[]): void {
+    public sendCandidates(candidates: saltyrtc.tasks.webrtc.Candidate[]): void {
         // Add to buffer
         console.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
         this.candidates.push(...candidates);
