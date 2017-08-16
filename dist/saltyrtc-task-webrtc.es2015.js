@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.9.1
+ * saltyrtc-task-webrtc v0.9.3
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -383,17 +383,19 @@ class WebRTCTask {
             return false;
         }
         for (let candidate of message['candidates']) {
-            if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
-                return false;
-            }
-            if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
-                return false;
-            }
-            if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
-                console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
-                return false;
+            if (candidate !== null) {
+                if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                    return false;
+                }
+                if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                    return false;
+                }
+                if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
+                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                    return false;
+                }
             }
         }
         return true;

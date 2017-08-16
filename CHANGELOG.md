@@ -12,6 +12,12 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.9.3 (2017-08-16)
+
+- [changed] Fix `null` ICE candidate handling (see saltyrtc/saltyrtc-meta#119)
+- [changed] Switch to dependencies in @saltyrtc npm organization
+- [added] Add test for sending large files
+
 ### v0.9.1 (2017-02-13)
 
 - [changed] Updated logging format
