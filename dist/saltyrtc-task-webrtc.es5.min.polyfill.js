@@ -3,7 +3,7 @@
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
- * Copyright (C) 2016 Threema GmbH
+ * Copyright (C) 2016-2017 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license:
