@@ -5,8 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference types='webrtc' />
-/// <reference types='chunked-dc' />
+/// <reference types="@saltyrtc/chunked-dc" />
 /// <reference path='types/tweetnacl.d.ts' />
 
 import {WebRTCTask} from "./task";
@@ -92,9 +91,9 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             data instanceof DataView) {
             const start = data.byteOffset || 0;
             const end = start + (data.byteLength || data.buffer.byteLength);
-            buffer = data.buffer.slice(start, end);
+            buffer = data.buffer.slice(start, end) as ArrayBuffer;
         } else if (data instanceof Uint8Array) {
-            buffer = data.buffer;
+            buffer = data.buffer as ArrayBuffer;
         } else if (data instanceof ArrayBuffer) {
             buffer = data;
         } else {
@@ -182,7 +181,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Validate nonce
         try {
-            this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
+            this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer as ArrayBuffer));
         } catch (e) {
             console.error(this.logTag, 'Invalid nonce:', e);
             console.error(this.logTag, 'Closing data channel');

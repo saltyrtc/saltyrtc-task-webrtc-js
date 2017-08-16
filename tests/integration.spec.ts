@@ -8,7 +8,7 @@
 /// <reference types="webrtc" />
 /// <reference path="jasmine.d.ts" />
 
-import {SaltyRTCBuilder, KeyStore} from "saltyrtc-client";
+import {SaltyRTCBuilder, KeyStore} from "@saltyrtc/client";
 import {WebRTCTask} from "../src/main";
 import {Config} from "./config";
 import {DummyTask} from "./testtasks";
@@ -490,7 +490,7 @@ export default () => { describe('Integration Tests', function() {
             console.info('100 MiB data sending test done');
 
             done();
-        }, 10000);
+        }, 15000);
 
     });
 

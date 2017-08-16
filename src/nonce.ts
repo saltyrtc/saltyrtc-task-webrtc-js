@@ -5,8 +5,7 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference types='saltyrtc-client' />
-
+/// <reference types="@saltyrtc/client" />
 
 /**
  * A SaltyRTC data channel nonce.

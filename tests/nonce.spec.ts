@@ -8,7 +8,7 @@
 /// <reference path="jasmine.d.ts" />
 
 import {DataChannelNonce} from "../src/nonce";
-import {Cookie} from "saltyrtc-client";
+import {Cookie} from "@saltyrtc/client";
 
 export default () => { describe('nonce', function() {
 

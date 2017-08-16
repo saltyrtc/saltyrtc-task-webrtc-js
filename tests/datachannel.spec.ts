@@ -7,7 +7,7 @@
 
 /// <reference path="jasmine.d.ts" />
 
-import {Box} from "saltyrtc-client";
+import {Box} from "@saltyrtc/client";
 import {SecureDataChannel} from "../src/datachannel";
 import {DataChannelNonce} from "../src/nonce";
 import {WebRTCTask} from "../src/task";

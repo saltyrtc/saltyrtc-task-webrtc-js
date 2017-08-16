@@ -18,8 +18,8 @@ config.plugins.push(
 )
 config.globals = {
     'tweetnacl': 'nacl',
-    'saltyrtc-client': 'saltyrtcClient',
-    'chunked-dc': 'chunkedDc'
+    '@saltyrtc/client': 'saltyrtcClient',
+    '@saltyrtc/chunked-dc': 'chunkedDc'
 };
 
 export default config;

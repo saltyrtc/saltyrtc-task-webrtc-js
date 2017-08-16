@@ -5,8 +5,6 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 
-/// <reference types='webrtc' />
-/// <reference types='saltyrtc-client' />
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
 
 /**
