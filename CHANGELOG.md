@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.9.4 (2017-08-16)
+
+- [fixed] Added missing type references to saltyrtc-task-webrtc.d.ts
+
 ### v0.9.3 (2017-08-16)
 
 - [changed] Fix `null` ICE candidate handling (see saltyrtc/saltyrtc-meta#119)
