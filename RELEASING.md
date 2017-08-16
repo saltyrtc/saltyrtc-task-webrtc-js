@@ -21,4 +21,4 @@ Commit & tag:
 Push & publish:
 
     $ git push && git push --tags
-    $ npm publish
+    $ npm publish --access public
