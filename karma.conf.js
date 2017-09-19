@@ -15,7 +15,8 @@ module.exports = function(config) {
                 base: 'Firefox',
                 profile: '/home/ci/.mozilla/firefox/saltyrtc',
             }
-        }
+        },
+        browserNoActivityTimeout: 30000 // ms, default: 10'000
     };
 
     if (process.env.CIRCLECI) {
