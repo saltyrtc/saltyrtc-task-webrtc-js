@@ -532,7 +532,7 @@ export default () => { describe('Integration Tests', function() {
                         wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
                         wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                         console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
-                        wrapped.send(nacl.randomBytes(dataBytes));
+                        wrapped.sendAsync(nacl.randomBytes(dataBytes));
                     }
                 });
             };
@@ -540,7 +540,7 @@ export default () => { describe('Integration Tests', function() {
             console.info('5x20 MiB data sending test done');
 
             done();
-        }, 15000);
+        }, 20000);
 
     });
 
