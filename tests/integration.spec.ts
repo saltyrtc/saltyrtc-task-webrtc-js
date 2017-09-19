@@ -486,11 +486,11 @@ export default () => { describe('Integration Tests', function() {
             await testWithSize(1024 * 1024 * 20); // 20 MiB
             console.info('20 MiB data sending test done');
 
-            await testWithSize(1024 * 1024 * 100); // 100 MiB
-            console.info('100 MiB data sending test done');
+            await testWithSize(1024 * 1024 * 75); // 75 MiB
+            console.info('75 MiB data sending test done');
 
             done();
-        }, 15000);
+        }, 20000);
 
     });
 

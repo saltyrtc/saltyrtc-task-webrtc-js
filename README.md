@@ -1,6 +1,6 @@
 # SaltyRTC WebRTC Task for JavaScript
 
-[![Travis branch](https://img.shields.io/travis/saltyrtc/saltyrtc-task-webrtc-js/master.svg)](https://travis-ci.org/saltyrtc/saltyrtc-task-webrtc-js)
+[![CircleCI](https://circleci.com/gh/saltyrtc/saltyrtc-task-webrtc-js/tree/master.svg?style=shield)][https://circleci.com/gh/saltyrtc/saltyrtc-task-webrtc-js/tree/master]
 [![Supported ES Standard](https://img.shields.io/badge/javascript-ES5%20%2F%20ES2015-yellow.svg)](https://github.com/saltyrtc/saltyrtc-task-webrtc-js)
 [![npm Version](https://img.shields.io/npm/v/@saltyrtc/task-webrtc.svg?maxAge=2592000)](https://www.npmjs.com/package/@saltyrtc/task-webrtc)
 [![npm Downloads](https://img.shields.io/npm/dt/@saltyrtc/task-webrtc.svg?maxAge=3600)](https://www.npmjs.com/package/@saltyrtc/task-webrtc)
