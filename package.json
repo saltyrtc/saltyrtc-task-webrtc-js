@@ -42,7 +42,7 @@
     "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
-    "@saltyrtc/client": "^0.9.1",
+    "@saltyrtc/client": "^0.10.0",
     "@types/webrtc": "0.0.21",
     "babel-es6-polyfill": "^1.1.0",
     "babel-plugin-external-helpers": "^6.8.0",
