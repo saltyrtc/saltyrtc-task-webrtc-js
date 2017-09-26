@@ -6,8 +6,8 @@
  */
 
 /// <reference types="@saltyrtc/chunked-dc" />
-/// <reference path='types/tweetnacl.d.ts' />
 
+import * as nacl from "tweetnacl";
 import {WebRTCTask} from "./task";
 import {DataChannelNonce} from "./nonce";
 
