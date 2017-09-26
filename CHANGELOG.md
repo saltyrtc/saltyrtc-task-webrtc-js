@@ -12,6 +12,11 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.10.0 (2017-09-26)
+
+- [changed] Upgrade @saltyrtc/client to ^0.10.0
+- [changed] Upgrade tweetnacl to ^1.0.0
+
 ### v0.9.4 (2017-08-16)
 
 - [fixed] Added missing type references to saltyrtc-task-webrtc.d.ts

@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.9.4
+ * saltyrtc-task-webrtc v0.10.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -27,6 +27,9 @@
  * SOFTWARE.
  */
 'use strict';
+
+import { box } from 'tweetnacl';
+import * as nacl from 'tweetnacl';
 
 class DataChannelNonce {
     constructor(cookie, channelId, overflow, sequenceNumber) {
@@ -102,9 +105,9 @@ class SecureDataChannel {
             for (let x in realEvent) {
                 fakeEvent[x] = realEvent[x];
             }
-            const box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
+            const box$$1 = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), box.nonceLength);
             try {
-                this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
+                this.validateNonce(DataChannelNonce.fromArrayBuffer(box$$1.nonce.buffer));
             }
             catch (e) {
                 console.error(this.logTag, 'Invalid nonce:', e);
@@ -113,7 +116,7 @@ class SecureDataChannel {
                 this.task.close(saltyrtcClient.CloseCode.ProtocolError);
                 return;
             }
-            const decrypted = this.task.getSignaling().decryptFromPeer(box);
+            const decrypted = this.task.getSignaling().decryptFromPeer(box$$1);
             fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
             this._onmessage.bind(this.dc)(fakeEvent);
         };
@@ -170,8 +173,8 @@ class SecureDataChannel {
             throw new Error('Unknown data type. Please pass in an ArrayBuffer ' +
                 'or a typed array (e.g. Uint8Array).');
         }
-        const box = this.encryptData(new Uint8Array(buffer));
-        const encryptedBytes = box.toUint8Array();
+        const box$$1 = this.encryptData(new Uint8Array(buffer));
+        const encryptedBytes = box$$1.toUint8Array();
         if (this.chunkSize === 0) {
             this.dc.send(encryptedBytes);
         }

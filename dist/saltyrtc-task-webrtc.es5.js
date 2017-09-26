@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.9.4
+ * saltyrtc-task-webrtc v0.10.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -28,7 +28,7 @@
  */
 'use strict';
 
-(function (exports) {
+(function (exports,nacl) {
 'use strict';
 
 var classCallCheck = function (instance, Constructor) {
@@ -256,9 +256,9 @@ var SecureDataChannel = function () {
             for (var x in realEvent) {
                 fakeEvent[x] = realEvent[x];
             }
-            var box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
+            var box$$1 = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
             try {
-                _this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
+                _this.validateNonce(DataChannelNonce.fromArrayBuffer(box$$1.nonce.buffer));
             } catch (e) {
                 console.error(_this.logTag, 'Invalid nonce:', e);
                 console.error(_this.logTag, 'Closing data channel');
@@ -266,7 +266,7 @@ var SecureDataChannel = function () {
                 _this.task.close(saltyrtcClient.CloseCode.ProtocolError);
                 return;
             }
-            var decrypted = _this.task.getSignaling().decryptFromPeer(box);
+            var decrypted = _this.task.getSignaling().decryptFromPeer(box$$1);
             fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
             _this._onmessage.bind(_this.dc)(fakeEvent);
         };
@@ -293,7 +293,7 @@ var SecureDataChannel = function () {
     }
 
     createClass(SecureDataChannel, [{
-        key: 'send',
+        key: "send",
         value: function send(data) {
             var buffer = void 0;
             if (typeof data === 'string') {
@@ -311,8 +311,8 @@ var SecureDataChannel = function () {
             } else {
                 throw new Error('Unknown data type. Please pass in an ArrayBuffer ' + 'or a typed array (e.g. Uint8Array).');
             }
-            var box = this.encryptData(new Uint8Array(buffer));
-            var encryptedBytes = box.toUint8Array();
+            var box$$1 = this.encryptData(new Uint8Array(buffer));
+            var encryptedBytes = box$$1.toUint8Array();
             if (this.chunkSize === 0) {
                 this.dc.send(encryptedBytes);
             } else {
@@ -344,7 +344,7 @@ var SecureDataChannel = function () {
             }
         }
     }, {
-        key: 'encryptData',
+        key: "encryptData",
         value: function encryptData(data) {
             var csn = this.csnPair.ours.next();
             var nonce = new DataChannelNonce(this.cookiePair.ours, this.dc.id, csn.overflow, csn.sequenceNumber);
@@ -352,7 +352,7 @@ var SecureDataChannel = function () {
             return encrypted;
         }
     }, {
-        key: 'validateNonce',
+        key: "validateNonce",
         value: function validateNonce(nonce) {
             if (nonce.cookie.equals(this.cookiePair.ours)) {
                 throw new Error('Local and remote cookie are equal');
@@ -371,12 +371,12 @@ var SecureDataChannel = function () {
             this.lastIncomingCsn = nonce.combinedSequenceNumber;
         }
     }, {
-        key: 'close',
+        key: "close",
         value: function close() {
             this.dc.close();
         }
     }, {
-        key: 'addEventListener',
+        key: "addEventListener",
         value: function addEventListener(type, listener, useCapture) {
             if (type === 'message') {
                 throw new Error('addEventListener on message events is not currently supported by SaltyRTC.');
@@ -385,7 +385,7 @@ var SecureDataChannel = function () {
             }
         }
     }, {
-        key: 'removeEventListener',
+        key: "removeEventListener",
         value: function removeEventListener(type, listener, useCapture) {
             if (type === 'message') {
                 throw new Error('removeEventListener on message events is not currently supported by SaltyRTC.');
@@ -394,57 +394,57 @@ var SecureDataChannel = function () {
             }
         }
     }, {
-        key: 'dispatchEvent',
+        key: "dispatchEvent",
         value: function dispatchEvent(e) {
             return this.dc.dispatchEvent(e);
         }
     }, {
-        key: 'label',
+        key: "label",
         get: function get() {
             return this.dc.label;
         }
     }, {
-        key: 'ordered',
+        key: "ordered",
         get: function get() {
             return this.dc.ordered;
         }
     }, {
-        key: 'maxPacketLifeTime',
+        key: "maxPacketLifeTime",
         get: function get() {
             return this.dc.maxPacketLifeTime;
         }
     }, {
-        key: 'maxRetransmits',
+        key: "maxRetransmits",
         get: function get() {
             return this.dc.maxRetransmits;
         }
     }, {
-        key: 'protocol',
+        key: "protocol",
         get: function get() {
             return this.dc.protocol;
         }
     }, {
-        key: 'negotiated',
+        key: "negotiated",
         get: function get() {
             return this.dc.negotiated;
         }
     }, {
-        key: 'id',
+        key: "id",
         get: function get() {
             return this.dc.id;
         }
     }, {
-        key: 'readyState',
+        key: "readyState",
         get: function get() {
             return this.dc.readyState;
         }
     }, {
-        key: 'bufferedAmount',
+        key: "bufferedAmount",
         get: function get() {
             return this.dc.bufferedAmount;
         }
     }, {
-        key: 'bufferedAmountLowThreshold',
+        key: "bufferedAmountLowThreshold",
         get: function get() {
             return this.dc.bufferedAmountLowThreshold;
         },
@@ -452,7 +452,7 @@ var SecureDataChannel = function () {
             this.dc.bufferedAmountLowThreshold = value;
         }
     }, {
-        key: 'binaryType',
+        key: "binaryType",
         get: function get() {
             return this.dc.binaryType;
         },
@@ -460,7 +460,7 @@ var SecureDataChannel = function () {
             this.dc.binaryType = value;
         }
     }, {
-        key: 'onopen',
+        key: "onopen",
         get: function get() {
             return this.dc.onopen;
         },
@@ -468,7 +468,7 @@ var SecureDataChannel = function () {
             this.dc.onopen = value;
         }
     }, {
-        key: 'onbufferedamountlow',
+        key: "onbufferedamountlow",
         get: function get() {
             return this.dc.onbufferedamountlow;
         },
@@ -476,7 +476,7 @@ var SecureDataChannel = function () {
             this.dc.onbufferedamountlow = value;
         }
     }, {
-        key: 'onerror',
+        key: "onerror",
         get: function get() {
             return this.dc.onerror;
         },
@@ -484,7 +484,7 @@ var SecureDataChannel = function () {
             this.dc.onerror = value;
         }
     }, {
-        key: 'onclose',
+        key: "onclose",
         get: function get() {
             return this.dc.onclose;
         },
@@ -492,7 +492,7 @@ var SecureDataChannel = function () {
             this.dc.onclose = value;
         }
     }, {
-        key: 'onmessage',
+        key: "onmessage",
         get: function get() {
             return this.dc.onmessage;
         },
@@ -994,4 +994,4 @@ WebRTCTask.CANDIDATE_BUFFERING_MS = 5;
 
 exports.WebRTCTask = WebRTCTask;
 
-}((this.saltyrtcTaskWebrtc = this.saltyrtcTaskWebrtc || {})));
+}((this.saltyrtcTaskWebrtc = this.saltyrtcTaskWebrtc || {}),nacl));
