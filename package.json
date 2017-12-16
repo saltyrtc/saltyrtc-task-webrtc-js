@@ -13,7 +13,7 @@
     "dist_es5_min": "rollup -c rollup/es5.min.js",
     "dist_es5_min_polyfill": "rollup -c rollup/es5.min.polyfill.js",
     "dist_es2015": "rollup -c rollup/es2015.js",
-    "rollup_tests": "rollup -c rollup/testing.js",
+    "rollup_tests": "rollup -c rollup/testing.js && rollup -c rollup/benchmark.js",
     "validate": "tsc --noEmit"
   },
   "repository": {
@@ -59,6 +59,6 @@
     "rollup-plugin-uglify": "^1.0.1",
     "tweetnacl": "^1.0.0",
     "typescript": "^2.5.2",
-    "webrtc-adapter": "^5.0.4"
+    "webrtc-adapter": "lgrahl/adapter#dc-max-message-size"
   }
 }
