@@ -460,7 +460,7 @@ export default () => { describe('Integration Tests', function() {
             done();
         });
 
-        it('can send large files', async (done) => {
+        it('can send large files (serial)', async (done) => {
             let connections: {
                 initiator: RTCPeerConnection,
                 responder: RTCPeerConnection,
@@ -471,14 +471,20 @@ export default () => { describe('Integration Tests', function() {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         e.channel.binaryType = 'arraybuffer';
                         const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
                             resolve();
                         }
                     };
-                    let dc = connections.initiator.createDataChannel('dc10m');
+                    let dc = connections.initiator.createDataChannel('dc' + dataBytes);
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                    wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                    wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
             };
@@ -491,6 +497,51 @@ export default () => { describe('Integration Tests', function() {
 
             await testWithSize(1024 * 1024 * 256); // 256 MiB
             console.info('256 MiB data sending test done');
+
+            done();
+        }, 120000);
+
+        it('can send large files (parallel)', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testParallel = (count: number, dataBytes: number) => {
+                return new Promise((resolve) => {
+                    let done = 0;
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onmessage = (m: MessageEvent) => {
+                            expect(m.data.byteLength).toEqual(dataBytes);
+                            done += 1;
+                            console.debug('Parallel test', done, 'done');
+                            if (done == count) {
+                                resolve();
+                            }
+                        }
+                    };
+
+                    const data = nacl.randomBytes(dataBytes);
+                    for (let i = 0; i < count; i++) {
+                        console.debug('Starting parallel test', i);
+                        let dc = connections.initiator.createDataChannel('dc' + i);
+                        dc.binaryType = 'arraybuffer';
+                        const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
+                        wrapped.send(data);
+                    }
+                });
+            };
+            await testParallel(5, 20 * 1024 * 1024);
+            console.info('5x20 MiB data sending test done');
 
             done();
         }, 60000);
