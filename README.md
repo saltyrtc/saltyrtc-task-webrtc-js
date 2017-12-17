@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/saltyrtc/saltyrtc-task-webrtc-js)
 [![Chat on Gitter](https://badges.gitter.im/saltyrtc/Lobby.svg)](https://gitter.im/saltyrtc/Lobby)
 
-This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task implementation for
-JavaScript (ES5 / ES2015), written in TypeScript 2.
+This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task version 1 implementation for
+JavaScript (ES5 / ES2015), written in TypeScript.
 
 **Warning: This is beta software. Use at your own risk. Testing and review is
 welcome!**
@@ -23,15 +23,13 @@ You can install this library via `npm`:
 
 ## Usage
 
-When creating the task instance, you can specify whether or not a handover to a secure data channel is desired.
+When creating the task instance, you can specify whether or not a handover to a dedicated data channel is desired.
+In case you want to apply a handover, you must implement the `SignalingTransportHandler` interface and provide a
+factory function to create an instance of it. 
 
-    let task = new WebRTCTask(true);
+    let task = new WebRTCTask(signalingTransportHandlerFactory);
 
-You can also specify the max DataChannel chunk size:
-
-    let task = new WebRTCTask(true, 65536);
-
-If you don't specify any values, handover defaults to `true` and the chunk size defaults to `16384`.
+If you don't specify any values, no handover will be requested.
 
 The handover can be initiated using the handover method:
 

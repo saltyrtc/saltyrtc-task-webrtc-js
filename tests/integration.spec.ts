@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2018 Threema GmbH
+ * Copyright (C) 2016-2019 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the `LICENSE.md` file for details.
@@ -17,7 +17,7 @@ export default () => { describe('Integration Tests', function() {
 
     beforeEach(() => {
         // Set default timeout
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 3000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
 
         // Connect and await a certain state for two peers
         this.connectBoth = (a, b, state) => {
@@ -56,13 +56,13 @@ export default () => { describe('Integration Tests', function() {
     describe('WebRTCTask', () => {
 
         beforeEach(() => {
-            this.initiatorTask = new WebRTCTask();
+            this.initiatorTask = new WebRTCTask(undefined, undefined, 'info');
             this.initiator = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
                 .usingTasks([this.initiatorTask])
                 .asInitiator() as saltyrtc.SaltyRTC;
-            this.responderTask = new WebRTCTask();
+            this.responderTask = new WebRTCTask(undefined, undefined, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -402,7 +402,7 @@ export default () => { describe('Integration Tests', function() {
         });
 
         it('cannot do handover if disabled via constructor', async (done) => {
-            this.responderTask = new WebRTCTask(false);
+            this.responderTask = new WebRTCTask(false, undefined, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -414,14 +414,14 @@ export default () => { describe('Integration Tests', function() {
             done();
         });
 
-        it('can safely increase the chunk size', async (done) => {
-            this.initiatorTask = new WebRTCTask(true, 65536);
+        it('can safely increase the chunk byte length', async (done) => {
+            this.initiatorTask = new WebRTCTask(true, 65536, 'info');
             this.initiator = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
                 .usingTasks([this.initiatorTask])
                 .asInitiator() as saltyrtc.SaltyRTC;
-            this.responderTask = new WebRTCTask(true, 65536);
+            this.responderTask = new WebRTCTask(true, 65536, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -455,13 +455,64 @@ export default () => { describe('Integration Tests', function() {
                 });
             };
             await testEncrypted();
-            console.info('Data channel test with chunk size 65536 done');
+            console.info('Data channel test with chunk byte length 65536 done');
 
             done();
         });
 
-        /* Disabled for now, flaky results in CI
-        it('can send large files', async (done) => {
+        it('fires the "bufferedamountlow" event', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testWithSize = (dataBytes) => {
+                return new Promise((resolve, reject) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.bufferedAmountLowThreshold = 0;
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            reject(`Other data channel's "bufferedamountlow" event shall not fire`);
+                        };
+                    };
+                    let dc = connections.initiator.createDataChannel('dc');
+                    dc.binaryType = 'arraybuffer';
+                    const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.bufferedAmountLowThreshold = Math.min(dataBytes, 1024 * 777);
+                    wrapped.onbufferedamountlow = (e: Event) => {
+                        console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                        expect(wrapped.bufferedAmount).not.toBeGreaterThan(wrapped.bufferedAmountLowThreshold);
+                        resolve();
+                    };
+
+                    // Send
+                    wrapped.send(nacl.randomBytes(dataBytes));
+                });
+            };
+
+            await testWithSize(1024 * 16); // 16 KiB
+            console.info('16 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 256); // 256 KiB
+            console.info('256 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 777); // 777 KiB
+            console.info('777 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024); // 1 MiB
+            console.info('1 MiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024 * 2); // 2 MiB
+            console.info('2 MiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024 * 10); // 10 MiB
+            console.info('10 MiB bufferedamountlow test done');
+
+            done();
+        }, 120000);
+
+        it('can send large files (serial)', async (done) => {
             let connections: {
                 initiator: RTCPeerConnection,
                 responder: RTCPeerConnection,
@@ -472,14 +523,26 @@ export default () => { describe('Integration Tests', function() {
                     connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
                         e.channel.binaryType = 'arraybuffer';
                         const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                        };
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
-                            resolve();
+                            resolve()
                         }
                     };
-                    let dc = connections.initiator.createDataChannel('dc10m');
+                    let dc = connections.initiator.createDataChannel('dc' + dataBytes);
                     dc.binaryType = 'arraybuffer';
                     const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                    wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                    wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                    wrapped.onbufferedamountlow = (e: Event) => {
+                        console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                    };
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
             };
@@ -490,9 +553,62 @@ export default () => { describe('Integration Tests', function() {
             await testWithSize(1024 * 1024 * 75); // 75 MiB
             console.info('75 MiB data sending test done');
 
+            // await testWithSize(1024 * 1024 * 256); // 256 MiB
+            // console.info('256 MiB data sending test done');
+
             done();
-        }, 30000);
-        */
+        }, 120000);
+
+        it('can send large files (parallel)', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testParallel = (count: number, dataBytes: number) => {
+                return new Promise((resolve) => {
+                    let done = 0;
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'buferedamountlow:', e);
+                        };
+                        wrapped.onmessage = (m: MessageEvent) => {
+                            expect(m.data.byteLength).toEqual(dataBytes);
+                            done += 1;
+                            console.debug('Parallel test', done, 'done');
+                            if (done == count) {
+                                resolve();
+                            }
+                        }
+                    };
+
+                    const data = nacl.randomBytes(dataBytes);
+                    for (let i = 0; i < count; i++) {
+                        console.debug('Starting parallel test', i);
+                        let dc = connections.initiator.createDataChannel('dc' + i);
+                        dc.binaryType = 'arraybuffer';
+                        const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                        wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
+                        wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
+                        wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'buferedamountlow:', e);
+                        };
+                        console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
+                        wrapped.send(data);
+                    }
+                });
+            };
+            await testParallel(5, 10 * 1024 * 1024);
+            console.info('5x10 MiB data sending test done');
+
+            done();
+        }, 120000);
 
     });
 
