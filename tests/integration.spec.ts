@@ -460,7 +460,6 @@ export default () => { describe('Integration Tests', function() {
             done();
         });
 
-        /* Disabled for now, flaky results in CI
         it('can send large files', async (done) => {
             let connections: {
                 initiator: RTCPeerConnection,
@@ -490,9 +489,11 @@ export default () => { describe('Integration Tests', function() {
             await testWithSize(1024 * 1024 * 75); // 75 MiB
             console.info('75 MiB data sending test done');
 
+            await testWithSize(1024 * 1024 * 256); // 256 MiB
+            console.info('256 MiB data sending test done');
+
             done();
-        }, 30000);
-        */
+        }, 60000);
 
     });
 

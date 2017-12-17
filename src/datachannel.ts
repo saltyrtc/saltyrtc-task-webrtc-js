@@ -35,10 +35,21 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     // Chunking
     private static CHUNK_COUNT_GC = 32;
     private static CHUNK_MAX_AGE = 60000;
+    private static CHUNK_HEADER_LENGTH = 9; // TODO: Can we retrieve this from chunked-dc-js?
     private chunkSize;
     private messageNumber = 0;
     private chunkCount = 0;
     private unchunker: chunkedDc.Unchunker;
+
+    // Buffering
+    private static HIGH_WATER_MARK_MIN = 1048576; // 1 MiB
+    private static HIGH_WATER_MARK_MAX = 8388608; // 8 MiB
+    private static LOW_WATER_MARK_RATIO = 8; // = high water mark divided by 8.
+    private _onbufferedamountlow: (event: Event) => void;
+    private chunkers: chunkedDc.Chunker[] = [];
+    private chunkBufferedAmount = 0;
+    private currentlySending = false;
+    private _bufferedAmountHighTreshold: number;
 
     // SaltyRTC
     private cookiePair: saltyrtc.CookiePair;
@@ -61,12 +72,29 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             throw new Error('Could not determine max chunk size');
         }
 
+        // Use a somewhat sane default for the high water mark
+        // Note: 16 MiB seems to be the maximum buffer size in Chrome (tested on Chromium 63.0.3239.84).
+        this._bufferedAmountHighTreshold = Math.min(
+            Math.max(this.chunkSize * 8, SecureDataChannel.HIGH_WATER_MARK_MIN),
+            SecureDataChannel.HIGH_WATER_MARK_MAX);
+        console.debug(this.logTag, 'Set the initial high water mark to', this._bufferedAmountHighTreshold);
+
+        // Use a somewhat sane default for the low water mark (if not already changed by the user application)
+        if (this.dc.bufferedAmountLowThreshold === 0) {
+            this.dc.bufferedAmountLowThreshold = Math.max(
+                Math.floor(this._bufferedAmountHighTreshold / SecureDataChannel.LOW_WATER_MARK_RATIO));
+            console.debug(this.logTag, 'Set the initial low water mark to', this.dc.bufferedAmountLowThreshold);
+        } else {
+            console.debug(this.logTag, 'Left the low water mark at', this.dc.bufferedAmountLowThreshold);
+        }
+
         // Incoming dc messages are handled depending on the negotiated chunk size
         if (this.chunkSize === 0) {
             this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data, [event]);
         } else {
             this.unchunker = new chunkedDc.Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
+            this.dc.onbufferedamountlow = this.onUnderlyingBufferedAmountLow;
             this.dc.onmessage = this.onChunk;
         }
     }
@@ -104,13 +132,55 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Split into chunks if desired and send
         if (this.chunkSize === 0) {
+            // Note: Implementations that allow for arbitrary sizes usually just buffer until OOM.
+            //       Thus, it's probably fine to just pass the data along.
             this.dc.send(encryptedBytes);
         } else {
+            // Update buffered amount and add chunker to list
+            // TODO: This will fail for unreliable channels
+            this.chunkBufferedAmount += encryptedBytes.byteLength;
             const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
-            for (let chunk of chunker) {
-                this.dc.send(chunk);
+            this.chunkers.push(chunker);
+
+            // Wake up if possible
+            if (this.dc.bufferedAmount <= this.dc.bufferedAmountLowThreshold) {
+                this.continueSending();
             }
         }
+    }
+
+    private continueSending() {
+        // Avoid nested calls
+        if (this.currentlySending) {
+            return;
+        }
+        this.currentlySending = true;
+
+        // Send pending chunks from chunkers
+        while (this.chunkers.length > 0) {
+            const chunker = this.chunkers[0];
+            for (const chunk of chunker) {
+                // Send chunk
+                const length = chunk.byteLength;
+                this.dc.send(chunk);
+
+                // Update buffered amount
+                // TODO: This will fail for unreliable channels
+                this.chunkBufferedAmount -= length - SecureDataChannel.CHUNK_HEADER_LENGTH;
+
+                // Pause sending?
+                if (this.dc.bufferedAmount >= this._bufferedAmountHighTreshold) {
+                    this.currentlySending = false;
+                    return;
+                }
+            }
+
+            // Remove chunker when exhausted
+            this.chunkers.shift();
+        }
+
+        // Done
+        this.currentlySending = false;
     }
 
     /**
@@ -129,6 +199,24 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         // Encrypt
         return this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
     }
+
+    /**
+     * The underlying data channel is telling us it wants more data.
+     */
+    private onUnderlyingBufferedAmountLow = (event: Event) => {
+        // Continue sending
+        this.continueSending();
+
+        // If _onbufferedamountlow is not defined, exit immediately.
+        if (this._onbufferedamountlow === undefined) {
+            return;
+        }
+
+        // If the total buffered amount low, raise the event for the user application
+        if (this.getTotalBufferedAmount() <= this.dc.bufferedAmountLowThreshold) {
+            this._onbufferedamountlow.bind(this.dc)(event);
+        }
+    };
 
     /**
      * A new chunk arrived.
@@ -197,7 +285,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         this._onmessage.bind(this.dc)(fakeEvent);
     };
 
-    private validateNonce(nonce: DataChannelNonce):void {
+    private validateNonce(nonce: DataChannelNonce) {
         // Make sure cookies are not the same
         if (nonce.cookie.equals(this.cookiePair.ours)) {
             throw new Error('Local and remote cookie are equal');
@@ -227,6 +315,10 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         this.lastIncomingCsn = nonce.combinedSequenceNumber;
     }
 
+    private getTotalBufferedAmount() {
+        return this.chunkBufferedAmount + this.dc.bufferedAmount;
+    }
+
     // Readonly attributes
     get label(): string { return this.dc.label; }
     get ordered(): boolean { return this.dc.ordered; }
@@ -236,7 +328,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     get negotiated(): boolean { return this.dc.negotiated; }
     get id(): number { return this.dc.id; }
     get readyState(): RTCDataChannelState { return this.dc.readyState; }
-    get bufferedAmount(): number { return this.dc.bufferedAmount; }
+    get bufferedAmount(): number { return this.getTotalBufferedAmount(); }
 
     // Read/write attributes
     get bufferedAmountLowThreshold(): number { return this.dc.bufferedAmountLowThreshold; }
@@ -244,30 +336,39 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     get binaryType(): RTCBinaryType { return this.dc.binaryType; }
     set binaryType(value: RTCBinaryType) { this.dc.binaryType = value; }
 
+    // Custom read/write attributes
+    get bufferedAmountHighTreshold(): number { return this._bufferedAmountHighTreshold; }
+    set bufferedAmountHighTreshold(value: number) {
+        if (value <= 1) {
+            throw 'Invalid parameter';
+        }
+        this._bufferedAmountHighTreshold = value;
+    }
+
     // Event handlers
     get onopen(): EventHandler { return this.dc.onopen; }
     set onopen(value: EventHandler) { this.dc.onopen = value; }
-    get onbufferedamountlow(): EventHandler { return this.dc.onbufferedamountlow; }
-    set onbufferedamountlow(value: EventHandler) { this.dc.onbufferedamountlow = value; }
+    get onbufferedamountlow(): EventHandler { return this._onbufferedamountlow; }
+    set onbufferedamountlow(value: EventHandler) { this._onbufferedamountlow = value; }
     get onerror(): EventHandler { return this.dc.onerror; }
     set onerror(value: EventHandler) { this.dc.onerror = value; }
     get onclose(): EventHandler { return this.dc.onclose; }
     set onclose(value: EventHandler) { this.dc.onclose = value; }
-    get onmessage(): MessageEventHandler { return this.dc.onmessage; }
+    get onmessage(): MessageEventHandler { return this._onmessage; }
     set onmessage(value: MessageEventHandler) { this._onmessage = value; }
 
     // Regular methods
-    close(): void { this.dc.close(); }
+    close() { this.dc.close(); }
 
     // EventTarget API (according to https://developer.mozilla.org/de/docs/Web/API/EventTarget)
-    addEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void {
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean) {
         if (type === 'message') {
             throw new Error('addEventListener on message events is not currently supported by SaltyRTC.');
         } else {
             this.dc.addEventListener(type, listener, useCapture);
         }
     }
-    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void {
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean) {
         if (type === 'message') {
             throw new Error('removeEventListener on message events is not currently supported by SaltyRTC.');
         } else {
