@@ -17,7 +17,7 @@ export default () => { describe('Integration Tests', function() {
 
     beforeEach(() => {
         // Set default timeout
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 3000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
 
         // Connect and await a certain state for two peers
         this.connectBoth = (a, b, state) => {
