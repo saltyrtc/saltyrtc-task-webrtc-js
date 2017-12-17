@@ -1,7 +1,7 @@
 {
   "name": "@saltyrtc/task-webrtc",
-  "version": "0.13.0",
-  "description": "A SaltyRTC WebRTC task implementation.",
+  "version": "0.14.0",
+  "description": "A SaltyRTC WebRTC task v1 implementation.",
   "main": "dist/saltyrtc-task-webrtc.es5.min.js",
   "module": "dist/saltyrtc-task-webrtc.es2015.js",
   "jsnext:main": "dist/saltyrtc-task-webrtc.es2015.js",
@@ -35,7 +35,7 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "@saltyrtc/chunked-dc": "^1.1.1"
+    "@saltyrtc/chunked-dc": "^2.0.0"
   },
   "peerDependencies": {
     "@saltyrtc/client": "^0.13.2",
@@ -63,7 +63,7 @@
   },
   "files": [
     "dist",
-    "saltyrtc-task-webrtc.d.ts",
+      "saltyrtc-task-webrtc.d.ts",
     "README.md",
     "LICENSE.md",
     "CHANGELOG.md",

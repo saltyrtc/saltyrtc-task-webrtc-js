@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2018 Threema GmbH
+ * Copyright (C) 2016-2019 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the `LICENSE.md` file for details.
@@ -17,6 +17,8 @@ const CHUNK_HEADER_LENGTH = 9;
 
 class FakeDataChannel {
     public binaryType = 'arraybuffer';
+    public bufferedAmountLowThreshold = 0;
+    public bufferedAmount = 0;
 }
 
 class FakeSignaling {
