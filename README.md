@@ -5,6 +5,7 @@
 [![npm Version](https://img.shields.io/npm/v/@saltyrtc/task-webrtc.svg?maxAge=2592000)](https://www.npmjs.com/package/@saltyrtc/task-webrtc)
 [![npm Downloads](https://img.shields.io/npm/dt/@saltyrtc/task-webrtc.svg?maxAge=3600)](https://www.npmjs.com/package/@saltyrtc/task-webrtc)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/saltyrtc/saltyrtc-task-webrtc-js)
+[![Chat on Gitter](https://badges.gitter.im/saltyrtc/Lobby.svg)](https://gitter.im/saltyrtc/Lobby)
 
 This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task implementation for
 JavaScript (ES5 / ES2015), written in TypeScript 2.0+.
