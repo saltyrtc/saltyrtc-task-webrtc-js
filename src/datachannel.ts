@@ -22,7 +22,7 @@ type MessageEventHandler = (event: MessageEvent) => void;
 export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChannel {
 
     // Logging
-    private logTag = '[SaltyRTC.SecureDataChannel]';
+    private logTag;
 
     // Wrapped data channel
     private dc: RTCDataChannel;
@@ -39,6 +39,9 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     private chunkCount = 0;
     private unchunker: chunkedDc.Unchunker;
 
+    // Buffering
+    private bufferedAmountLowHandlers = new Set();
+
     // SaltyRTC
     private cookiePair: saltyrtc.CookiePair;
     private csnPair: saltyrtc.CombinedSequencePair;
@@ -54,6 +57,9 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         this.cookiePair = new saltyrtcClient.CookiePair();
         this.csnPair = new saltyrtcClient.CombinedSequencePair();
 
+        this.logTag = '[SaltyRTC.SecureDataChannel.' + dc.id + ']';
+
+        // Determine max chunk size
         this.chunkSize = this.task.getMaxPacketSize();
         if (this.chunkSize === null) {
             throw new Error('Could not determine max chunk size');
@@ -63,16 +69,50 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         if (this.chunkSize === 0) {
             this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data, [event]);
         } else {
+            // If we are receiving chunked data, we pass this data to the unchunker.
+            // The `onEncryptedMessage` method is only called once the entire chunk
+            // has been received and reassembled.
             this.unchunker = new chunkedDc.Unchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
             this.dc.onmessage = this.onChunk;
+
+            // Decide on a value for the bufferedAmountLowThreshold
+            // TODO:
+            // - Update the WebRTC task spec, remove the chunk size negotiation
+            // - Instead, determine the max remote message size (https://lgrahl.de/drafts/large-dc-messages-firefox.html)
+            console.debug(this.logTag, 'bufferedAmountLowThreshold was ' + this.dc.bufferedAmountLowThreshold);
+            console.debug(this.logTag, 'chunkSize is ' + this.chunkSize);
+            //this.dc.bufferedAmountLowThreshold = 4 * this.chunkSize;
+            this.dc.bufferedAmountLowThreshold = 0;
+            console.debug(this.logTag, 'bufferedAmountLowThreshold is ' + this.dc.bufferedAmountLowThreshold);
+
+            // When the buffered amount is low, notify all handlers.
+            this.dc.onbufferedamountlow = (e: Event) => {
+                console.debug(this.logTag, 'onbufferedamountlow');
+                for (let handler of this.bufferedAmountLowHandlers) {
+                    handler(e);
+                }
+            };
         }
     }
 
     /**
-     * Encrypt and send a message through the data channel.
+     * Wait for the `bufferedAmountLowThreshold` event on the datachannel.
      */
-    public send(data: string|Blob|ArrayBuffer|ArrayBufferView): void {
+    private async bufferedAmountIsLow(): Promise<void> {
+        return new Promise<void>((resolve) => {
+            const handler = (e: Event) => {
+                this.bufferedAmountLowHandlers.delete(handler);
+                resolve();
+            };
+            this.bufferedAmountLowHandlers.add(handler);
+        });
+    }
+
+    /**
+     * Validate and encrypt input data.
+     */
+    private prepareSend(data: string|Blob|ArrayBuffer|ArrayBufferView): Uint8Array {
         // Validate input data
         let buffer: ArrayBuffer;
         if (typeof data === 'string') {
@@ -105,6 +145,18 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         const box: saltyrtc.Box = this.encryptData(new Uint8Array(buffer));
         const encryptedBytes: Uint8Array = box.toUint8Array();
 
+        return encryptedBytes;
+    }
+
+    /**
+     * Encrypt and send a message synchronously through the data channel.
+     */
+    // TODO: This method should also do buffering, so we should wrap the
+    // sendAsync method somehow that it's still API compatible.
+    public send(data: string|Blob|ArrayBuffer|ArrayBufferView): void {
+        // Validate and encrypt
+        const encryptedBytes = this.prepareSend(data);
+
         // Split into chunks if desired and send
         if (this.chunkSize === 0) {
             this.dc.send(encryptedBytes);
@@ -112,6 +164,33 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
             for (let chunk of chunker) {
                 this.dc.send(chunk);
+            }
+        }
+    }
+
+    /**
+     * Encrypt and send a message asynchronously through the data channel.
+     *
+     * This method should be preferred over the synchronous `send` method
+     * because it prevents overfilling the send buffer.
+     */
+    public async sendAsync(data: string|Blob|ArrayBuffer|ArrayBufferView): Promise<void> {
+        // Validate and encrypt
+        const encryptedBytes = this.prepareSend(data);
+
+        // Split into chunks if desired and send
+        if (this.chunkSize === 0) {
+            this.dc.send(encryptedBytes);
+        } else {
+            const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+            for (let chunk of chunker) {
+                if (this.dc.bufferedAmount <= this.dc.bufferedAmountLowThreshold) {
+                    console.debug(this.logTag, 'bufferedAmount is ' + this.dc.bufferedAmount);
+                    this.dc.send(chunk);
+                } else {
+                    await this.bufferedAmountIsLow();
+                    this.dc.send(chunk);
+                }
             }
         }
     }
