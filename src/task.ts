@@ -166,6 +166,18 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
+     * This method is called by SaltyRTC when a 'disconnected' message
+     * arrives through the WebSocket.
+     *
+     * @param id The responder ID of the peer that disconnected.
+     */
+    onDisconnected(id: number): void {
+        // A 'disconnected' message arrived.
+        // Notify the user application.
+        this.emit({type: 'disconnected', data: id});
+    }
+
+    /**
      * Handle incoming task messages.
      *
      * This method should only be called by the signalig class, not by the end user!

@@ -57,6 +57,7 @@ The following events are available:
 * `offer(saltyrtc.tasks.webrtc.Offer)`: An offer message was received.
 * `answer(saltyrtc.tasks.webrtc.Answer)`: An answer message was received.
 * `candidates(saltyrtc.tasks.webrtc.Candidates)`: A candidates message was received.
+* `disconnected(number)`: A previously authenticated peer disconnected from the signaling server.
 
 To know when the handover is finished, please subscribe to the `handover` event on the client directly.
 
