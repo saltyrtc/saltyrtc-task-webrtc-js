@@ -8,7 +8,7 @@
 [![Chat on Gitter](https://badges.gitter.im/saltyrtc/Lobby.svg)](https://gitter.im/saltyrtc/Lobby)
 
 This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task implementation for
-JavaScript (ES5 / ES2015), written in TypeScript 2.0+.
+JavaScript (ES5 / ES2015), written in TypeScript 2.
 
 **Warning: This is beta software. Use at your own risk. Testing and review is
 welcome!**
