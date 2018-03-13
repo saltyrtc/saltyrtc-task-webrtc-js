@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.10.0
+ * saltyrtc-task-webrtc v0.11.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -598,6 +598,11 @@ var WebRTCTask = function () {
     }, {
         key: 'onPeerHandshakeDone',
         value: function onPeerHandshakeDone() {}
+    }, {
+        key: 'onDisconnected',
+        value: function onDisconnected(id) {
+            this.emit({ type: 'disconnected', data: id });
+        }
     }, {
         key: 'onTaskMessage',
         value: function onTaskMessage(message) {

@@ -12,6 +12,11 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.11.0 (2018-03-13)
+
+- [changed] Upgrade @saltyrtc/client to ^0.11.0
+- [added] Add 'disconnected' event
+
 ### v0.10.0 (2017-09-26)
 
 - [changed] Upgrade @saltyrtc/client to ^0.10.0
