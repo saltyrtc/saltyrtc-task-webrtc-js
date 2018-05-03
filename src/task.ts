@@ -44,7 +44,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Exclude list
     private exclude: Set<number> = new Set();
-    private sdcId;
+    private sdcId: number;
 
     // Effective max packet size
     private requestedMaxPacketSize: number;
