@@ -7,7 +7,7 @@
 
 /// <reference path="jasmine.d.ts" />
 
-import "../node_modules/babel-es6-polyfill/browser-polyfill";
+import "../node_modules/@babel/polyfill/dist/polyfill"; // Include ES5 polyfills
 
 import test_nonce from "./nonce.spec";
 import test_datachannel from "./datachannel.spec";
