@@ -33,16 +33,18 @@ You can also specify the max DataChannel chunk size:
 
 If you don't specify any values, handover defaults to `true` and the chunk size defaults to `16384`.
 
+The handover can be initiated using the handover method:
+
+    let started = task.handover(peerConnection);
+
+*Note: You should call this method before creating offer/answer!*
+
 To send offers, answers and candidates, use the following task methods:
 
 * `.sendOffer(offer: RTCSessionDescriptionInit): void`
 * `.sendAnswer(answer: RTCSessionDescriptionInit): void`
 * `.sendCandidate(candidate: RTCIceCandidateInit): void`
 * `.sendCandidates(candidates: RTCIceCandidateInit[]): void`
-
-The handover can be initiated using the handover method:
-
-    let started = task.handover(peerConnection);
 
 You can register and deregister event handlers with the `on`, `once` and `off` methods:
 
