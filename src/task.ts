@@ -90,7 +90,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Initialize the task with the task data from the peer.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
@@ -157,7 +157,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Used by the signaling class to notify task that the peer handshake is over.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     onPeerHandshakeDone(): void {
         // Do nothing.
@@ -180,7 +180,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Handle incoming task messages.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
         console.debug(this.logTag, 'New task message arrived: ' + message.type);
@@ -280,7 +280,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Send a signaling message *through the data channel*.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      *
      * @param payload Non-encrypted message. The message will be encrypted by
      *   the underlying secure data channel.
@@ -308,7 +308,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Return the list of supported message types.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     getSupportedMessageTypes(): string[] {
         return ['offer', 'answer', 'candidates', 'handover'];
@@ -327,7 +327,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Return the task data used for negotiation in the `auth` message.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     getData(): Object {
         const data = {};
@@ -340,7 +340,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Return a reference to the signaling instance.
      *
-     * This method should only be called by the signalig class, not by the end user!
+     * This method should only be called by the signaling class, not by the end user!
      */
     getSignaling(): saltyrtc.Signaling {
         return this.signaling;
