@@ -1,25 +1,27 @@
 import config from './es2015.js';
 import babel from 'rollup-plugin-babel';
 
-config.dest = 'dist/saltyrtc-task-webrtc.es5.js';
-config.format = 'iife';
-config.moduleName = 'saltyrtcTaskWebrtc';
-config.useStrict = true;
-config.plugins.push(
-    babel({
-        babelrc: false,
-        exclude: 'node_modules/**',
-        presets: [
-            // Use ES2015 but don't transpile modules since Rollup does that
-            ['es2015', {modules: false}]
-        ],
-        plugins: ['external-helpers']
-    })
-)
-config.globals = {
+config.output.file= 'dist/saltyrtc-task-webrtc.es5.js';
+config.output.format = 'iife';
+config.output.name = 'saltyrtcTaskWebrtc';
+config.output.strict = true;
+config.output.globals = {
     'tweetnacl': 'nacl',
     '@saltyrtc/client': 'saltyrtcClient',
     '@saltyrtc/chunked-dc': 'chunkedDc'
 };
+config.plugins.push(
+    babel({
+        babelrc: false,
+        exclude: 'node_modules/**',
+        externalHelpers: true,
+        presets: [
+            ['@babel/preset-env', {
+                modules: false,
+                forceAllTransforms: true,
+            }]
+        ],
+    })
+);
 
 export default config;
