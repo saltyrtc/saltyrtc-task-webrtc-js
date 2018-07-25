@@ -1,9 +1,9 @@
 /**
- * saltyrtc-task-webrtc v0.11.0
+ * saltyrtc-task-webrtc v0.12.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
- * Copyright (C) 2016-2017 Threema GmbH
+ * Copyright (C) 2016-2018 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license:
@@ -29,7 +29,6 @@
 'use strict';
 
 import { box } from 'tweetnacl';
-import * as nacl from 'tweetnacl';
 
 class DataChannelNonce {
     constructor(cookie, channelId, overflow, sequenceNumber) {
