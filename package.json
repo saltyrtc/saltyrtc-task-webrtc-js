@@ -60,5 +60,14 @@
     "tweetnacl": "^1.0.0",
     "typescript": "^2.9.2",
     "webrtc-adapter": "^6.3.0"
-  }
+  },
+  "files": [
+    "dist",
+    "saltyrtc-task-webrtc.d.ts",
+    "README.md",
+    "LICENSE.md",
+    "CHANGELOG.md",
+    "package.json",
+    "package-lock.json"
+  ]
 }
