@@ -81,8 +81,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Use a somewhat sane default for the low water mark (if not already changed by the user application)
         if (this.dc.bufferedAmountLowThreshold === 0) {
-            this.dc.bufferedAmountLowThreshold = Math.max(
-                Math.floor(this._bufferedAmountHighTreshold / SecureDataChannel.LOW_WATER_MARK_RATIO));
+            this.dc.bufferedAmountLowThreshold =
+                Math.floor(this._bufferedAmountHighTreshold / SecureDataChannel.LOW_WATER_MARK_RATIO);
             console.debug(this.logTag, 'Set the initial low water mark to', this.dc.bufferedAmountLowThreshold);
         } else {
             console.debug(this.logTag, 'Left the low water mark at', this.dc.bufferedAmountLowThreshold);
