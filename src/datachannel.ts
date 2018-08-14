@@ -35,7 +35,6 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     // Chunking
     private static CHUNK_COUNT_GC = 32;
     private static CHUNK_MAX_AGE = 60000;
-    private static CHUNK_HEADER_LENGTH = 9; // TODO: Can we retrieve this from chunked-dc-js?
     private chunkSize;
     private messageNumber = 0;
     private chunkCount = 0;
@@ -166,7 +165,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
                 // Update buffered amount
                 // TODO: This will fail for unreliable channels
-                this.chunkBufferedAmount -= length - SecureDataChannel.CHUNK_HEADER_LENGTH;
+                this.chunkBufferedAmount -= length - chunkedDc.HEADER_LENGTH;
 
                 // Pause sending?
                 if (this.dc.bufferedAmount >= this._bufferedAmountHighTreshold) {
