@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.12.0
+ * saltyrtc-task-webrtc v0.12.1
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -957,7 +957,11 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
     }, {
       key: "off",
       value: function off(event, handler) {
-        this.eventRegistry.unregister(event, handler);
+        if (event === undefined) {
+          this.eventRegistry.unregisterAll();
+        } else {
+          this.eventRegistry.unregister(event, handler);
+        }
       }
     }, {
       key: "emit",
