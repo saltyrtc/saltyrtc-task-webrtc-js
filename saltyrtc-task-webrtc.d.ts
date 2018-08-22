@@ -36,7 +36,7 @@ declare namespace saltyrtc.tasks.webrtc {
         // Events
         on(event: string | string[], handler: saltyrtc.SaltyRTCEventHandler): void;
         once(event: string | string[], handler: saltyrtc.SaltyRTCEventHandler): void;
-        off(event: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void;
+        off(event?: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void;
     }
 
     interface WebRTCTaskStatic {

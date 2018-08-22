@@ -38,14 +38,14 @@
     "@saltyrtc/chunked-dc": "^1.0.0"
   },
   "peerDependencies": {
-    "@saltyrtc/client": "^0.12",
+    "@saltyrtc/client": "^0.12.4",
     "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0-beta.54",
     "@babel/polyfill": "^7.0.0-beta.54",
     "@babel/preset-env": "^7.0.0-beta.54",
-    "@saltyrtc/client": "^0.12",
+    "@saltyrtc/client": "^0.12.4",
     "@types/webrtc": "0.0.23",
     "jasmine-core": "^3.1.0",
     "karma": "^2.0.5",

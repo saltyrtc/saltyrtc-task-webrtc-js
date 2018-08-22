@@ -589,9 +589,15 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      *
      * If no handler is specified, remove all handlers for the specified
      * event(s).
+     *
+     * If no event name is specified, all event handlers will be cleared.
      */
-    public off(event: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void {
-        this.eventRegistry.unregister(event, handler);
+    public off(event?: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void {
+        if (event === undefined) {
+            this.eventRegistry.unregisterAll();
+        } else {
+            this.eventRegistry.unregister(event, handler);
+        }
     }
 
     /**
