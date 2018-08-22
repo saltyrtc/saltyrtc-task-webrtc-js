@@ -35,31 +35,31 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "@saltyrtc/chunked-dc": "^1.0.0"
+    "@saltyrtc/chunked-dc": "^1.1.1"
   },
   "peerDependencies": {
     "@saltyrtc/client": "^0.12.4",
     "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.0.0-beta.54",
-    "@babel/polyfill": "^7.0.0-beta.54",
-    "@babel/preset-env": "^7.0.0-beta.54",
+    "@babel/core": "^7.0.0-rc.2",
+    "@babel/polyfill": "^7.0.0-rc.2",
+    "@babel/preset-env": "^7.0.0-rc.2",
     "@saltyrtc/client": "^0.12.4",
     "@types/webrtc": "0.0.23",
-    "jasmine-core": "^3.1.0",
-    "karma": "^2.0.5",
+    "jasmine-core": "^3.2",
+    "karma": "^3.0.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-firefox-launcher": "^1.1.0",
     "karma-jasmine": "^1.1.2",
     "msgpack-lite": "^0.1.26",
-    "rollup": "^0.63",
-    "rollup-plugin-babel": "^4.0.0-beta.7",
+    "rollup": "^0.64",
+    "rollup-plugin-babel": "^4.0.0-beta.8",
     "rollup-plugin-typescript": "^0.8.1",
     "rollup-plugin-uglify": "^4.0.0",
     "tweetnacl": "^1.0.0",
     "typescript": "^2.9.2",
-    "webrtc-adapter": "^6.3.0"
+    "webrtc-adapter": "^6.3.2"
   },
   "files": [
     "dist",
