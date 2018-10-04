@@ -1,5 +1,5 @@
 /**
- * saltyrtc-task-webrtc v0.12.1
+ * saltyrtc-task-webrtc v0.13.0
  * A SaltyRTC WebRTC task implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
@@ -70,22 +70,22 @@ class DataChannelNonce {
 DataChannelNonce.TOTAL_LENGTH = 24;
 
 class SecureDataChannel {
-    constructor(dc, task) {
+    constructor(dc, task, logLevel = 'none') {
         this.logTag = '[SaltyRTC.SecureDataChannel]';
         this.messageNumber = 0;
         this.chunkCount = 0;
         this.onChunk = (event) => {
-            console.debug(this.logTag, 'Received chunk');
+            this.log.debug(this.logTag, 'Received chunk');
             if (event.data instanceof Blob) {
-                console.warn(this.logTag, 'Received message in blob format, which is not currently supported.');
+                this.log.warn(this.logTag, 'Received message in blob format, which is not currently supported.');
                 return;
             }
             else if (typeof event.data == 'string') {
-                console.warn(this.logTag, 'Received message in string format, which is not currently supported.');
+                this.log.warn(this.logTag, 'Received message in string format, which is not currently supported.');
                 return;
             }
             else if (!(event.data instanceof ArrayBuffer)) {
-                console.warn(this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
+                this.log.warn(this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
                 return;
             }
             this.unchunker.add(event.data, event);
@@ -98,7 +98,7 @@ class SecureDataChannel {
             if (this._onmessage === undefined) {
                 return;
             }
-            console.debug(this.logTag, 'Decrypting incoming data...');
+            this.log.debug(this.logTag, 'Decrypting incoming data...');
             const realEvent = context[context.length - 1];
             const fakeEvent = {};
             for (let x in realEvent) {
@@ -109,8 +109,8 @@ class SecureDataChannel {
                 this.validateNonce(DataChannelNonce.fromArrayBuffer(box$$1.nonce.buffer));
             }
             catch (e) {
-                console.error(this.logTag, 'Invalid nonce:', e);
-                console.error(this.logTag, 'Closing data channel');
+                this.log.error(this.logTag, 'Invalid nonce:', e);
+                this.log.error(this.logTag, 'Closing data channel');
                 this.close();
                 this.task.close(saltyrtcClient.CloseCode.ProtocolError);
                 return;
@@ -125,6 +125,7 @@ class SecureDataChannel {
         }
         this.dc = dc;
         this.task = task;
+        this.log = new saltyrtcClient.Log(logLevel);
         this.cookiePair = new saltyrtcClient.CookiePair();
         this.csnPair = new saltyrtcClient.CombinedSequencePair();
         this.chunkSize = this.task.getMaxPacketSize();
@@ -254,7 +255,8 @@ SecureDataChannel.CHUNK_COUNT_GC = 32;
 SecureDataChannel.CHUNK_MAX_AGE = 60000;
 
 class WebRTCTask {
-    constructor(handover = true, maxPacketSize = WebRTCTask.DEFAULT_MAX_PACKET_SIZE) {
+    constructor(handover = true, maxPacketSize = WebRTCTask.DEFAULT_MAX_PACKET_SIZE, logLevel = 'none') {
+        this.logTag = '[SaltyRTC.WebRTC]';
         this.initialized = false;
         this.exclude = new Set();
         this.doHandover = true;
@@ -262,14 +264,16 @@ class WebRTCTask {
         this.eventRegistry = new saltyrtcClient.EventRegistry();
         this.candidates = [];
         this.sendCandidatesTimeout = null;
+        this.log = new saltyrtcClient.Log(logLevel);
         this.doHandover = handover;
         this.requestedMaxPacketSize = maxPacketSize;
     }
-    get logTag() {
-        if (this.signaling === null || this.signaling === undefined) {
-            return '[SaltyRTC.WebRTC]';
-        }
-        return '[SaltyRTC.WebRTC.' + this.signaling.role + ']';
+    set signaling(signaling) {
+        this._signaling = signaling;
+        this.logTag = '[SaltyRTC.WebRTC.' + signaling.role + ']';
+    }
+    get signaling() {
+        return this._signaling;
     }
     init(signaling, data) {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE]);
@@ -308,7 +312,7 @@ class WebRTCTask {
         else {
             this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
         }
-        console.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize, 'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
+        this.log.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize, 'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
     }
     processHandover(handover) {
         if (handover === false) {
@@ -321,7 +325,7 @@ class WebRTCTask {
         this.emit({ type: 'disconnected', data: id });
     }
     onTaskMessage(message) {
-        console.debug(this.logTag, 'New task message arrived: ' + message.type);
+        this.log.debug(this.logTag, 'New task message arrived: ' + message.type);
         switch (message.type) {
             case 'offer':
                 if (this.validateOffer(message) !== true)
@@ -340,7 +344,7 @@ class WebRTCTask {
                 break;
             case 'handover':
                 if (this.doHandover === false) {
-                    console.error(this.logTag, 'Received unexpected handover message from peer');
+                    this.log.error(this.logTag, 'Received unexpected handover message from peer');
                     this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
                 }
@@ -349,56 +353,56 @@ class WebRTCTask {
                 }
                 this.signaling.handoverState.peer = true;
                 if (this.signaling.handoverState.both) {
-                    console.info(this.logTag, 'Handover to data channel finished');
+                    this.log.info(this.logTag, 'Handover to data channel finished');
                 }
                 break;
             default:
-                console.error(this.logTag, 'Received message with unknown type:', message.type);
+                this.log.error(this.logTag, 'Received message with unknown type:', message.type);
         }
     }
     validateOffer(message) {
         if (message['offer'] === undefined) {
-            console.warn(this.logTag, 'Offer message does not contain offer');
+            this.log.warn(this.logTag, 'Offer message does not contain offer');
             return false;
         }
         if (message['offer']['sdp'] === undefined) {
-            console.warn(this.logTag, 'Offer message does not contain offer sdp');
+            this.log.warn(this.logTag, 'Offer message does not contain offer sdp');
             return false;
         }
         return true;
     }
     validateAnswer(message) {
         if (message['answer'] === undefined) {
-            console.warn(this.logTag, 'Answer message does not contain answer');
+            this.log.warn(this.logTag, 'Answer message does not contain answer');
             return false;
         }
         if (message['answer']['sdp'] === undefined) {
-            console.warn(this.logTag, 'Answer message does not contain answer sdp');
+            this.log.warn(this.logTag, 'Answer message does not contain answer sdp');
             return false;
         }
         return true;
     }
     validateCandidates(message) {
         if (message['candidates'] === undefined) {
-            console.warn(this.logTag, 'Candidates message does not contain candidates');
+            this.log.warn(this.logTag, 'Candidates message does not contain candidates');
             return false;
         }
         if (message['candidates'].length < 1) {
-            console.warn(this.logTag, 'Candidates message contains empty candidate list');
+            this.log.warn(this.logTag, 'Candidates message contains empty candidate list');
             return false;
         }
         for (let candidate of message['candidates']) {
             if (candidate !== null) {
                 if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
                     return false;
                 }
                 if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
                     return false;
                 }
                 if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
                     return false;
                 }
             }
@@ -437,7 +441,7 @@ class WebRTCTask {
         return this.signaling;
     }
     sendOffer(offer) {
-        console.debug(this.logTag, 'Sending offer');
+        this.log.debug(this.logTag, 'Sending offer');
         try {
             this.signaling.sendTaskMessage({
                 'type': 'offer',
@@ -449,13 +453,13 @@ class WebRTCTask {
         }
         catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send offer:', e.message);
+                this.log.error(this.logTag, 'Could not send offer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
     }
     sendAnswer(answer) {
-        console.debug(this.logTag, 'Sending answer');
+        this.log.debug(this.logTag, 'Sending answer');
         try {
             this.signaling.sendTaskMessage({
                 'type': 'answer',
@@ -467,7 +471,7 @@ class WebRTCTask {
         }
         catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send answer:', e.message);
+                this.log.error(this.logTag, 'Could not send answer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
@@ -476,11 +480,11 @@ class WebRTCTask {
         this.sendCandidates([candidate]);
     }
     sendCandidates(candidates) {
-        console.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
+        this.log.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
         this.candidates.push(...candidates);
         const sendFunc = () => {
             try {
-                console.debug(this.logTag, 'Sending', this.candidates.length, 'candidate(s)');
+                this.log.debug(this.logTag, 'Sending', this.candidates.length, 'candidate(s)');
                 this.signaling.sendTaskMessage({
                     'type': 'candidates',
                     'candidates': this.candidates
@@ -488,7 +492,7 @@ class WebRTCTask {
             }
             catch (e) {
                 if (e.name === 'SignalingError') {
-                    console.error(this.logTag, 'Could not send candidates:', e.message);
+                    this.log.error(this.logTag, 'Could not send candidates:', e.message);
                     this.signaling.resetConnection(e.closeCode);
                 }
             }
@@ -502,17 +506,17 @@ class WebRTCTask {
         }
     }
     handover(pc) {
-        console.debug(this.logTag, 'Initiate handover');
+        this.log.debug(this.logTag, 'Initiate handover');
         if (this.doHandover === false) {
-            console.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
+            this.log.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
             return false;
         }
         if (this.signaling.handoverState.any) {
-            console.error(this.logTag, 'Handover already in progress or finished');
+            this.log.error(this.logTag, 'Handover already in progress or finished');
             return false;
         }
         if (this.sdcId === undefined || this.sdcId === null) {
-            console.error(this.logTag, 'Data channel id not set');
+            this.log.error(this.logTag, 'Data channel id not set');
             this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
             throw new Error('Data channel id not set');
         }
@@ -533,10 +537,10 @@ class WebRTCTask {
             }
         };
         this.sdc.onerror = (ev) => {
-            console.error(this.logTag, 'Signaling data channel error:', ev);
+            this.log.error(this.logTag, 'Signaling data channel error:', ev);
         };
         this.sdc.onbufferedamountlow = (ev) => {
-            console.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
+            this.log.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
         };
         this.sdc.onmessage = (ev) => {
             let decryptedData = new Uint8Array(ev.data);
@@ -545,27 +549,27 @@ class WebRTCTask {
         return true;
     }
     sendHandover() {
-        console.debug(this.logTag, 'Sending handover');
+        this.log.debug(this.logTag, 'Sending handover');
         try {
             this.signaling.sendTaskMessage({ 'type': 'handover' });
         }
         catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send handover message', e.message);
+                this.log.error(this.logTag, 'Could not send handover message', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
         this.signaling.handoverState.local = true;
         if (this.signaling.handoverState.both) {
-            console.info(this.logTag, 'Handover to data channel finished');
+            this.log.info(this.logTag, 'Handover to data channel finished');
         }
     }
     wrapDataChannel(dc) {
-        console.debug(this.logTag, "Wrapping data channel", dc.id);
+        this.log.debug(this.logTag, "Wrapping data channel", dc.id);
         return new SecureDataChannel(dc, this);
     }
     close(reason) {
-        console.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
+        this.log.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
         if (this.sdc !== null) {
             this.sdc.close();
         }
@@ -596,14 +600,14 @@ class WebRTCTask {
         }
     }
     emit(event) {
-        console.debug(this.logTag, 'New event:', event.type);
+        this.log.debug(this.logTag, 'New event:', event.type);
         const handlers = this.eventRegistry.get(event.type);
         for (let handler of handlers) {
             try {
                 this.callHandler(handler, event);
             }
             catch (e) {
-                console.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
+                this.log.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
             }
         }
     }

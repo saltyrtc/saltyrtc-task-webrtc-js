@@ -12,6 +12,11 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.13.0 (2018-10-04)
+
+- [changed] Upgrade @saltyrtc/client to ^0.13.1
+- [added] Make log level configurable (defaults to 'none')
+
 ### v0.12.1 (2018-08-22)
 
 - [added] Allow deregistering all event handlers (#23)
