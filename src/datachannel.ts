@@ -22,6 +22,7 @@ type MessageEventHandler = (event: MessageEvent) => void;
 export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChannel {
 
     // Logging
+    private log: saltyrtc.Log;
     private logTag = '[SaltyRTC.SecureDataChannel]';
 
     // Wrapped data channel
@@ -44,13 +45,14 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     private csnPair: saltyrtc.CombinedSequencePair;
     private lastIncomingCsn: number;
 
-    constructor(dc: RTCDataChannel, task: WebRTCTask) {
+    constructor(dc: RTCDataChannel, task: WebRTCTask, logLevel: saltyrtc.LogLevel = 'none') {
         if (dc.binaryType !== 'arraybuffer') {
             throw new Error('Currently SaltyRTC can only handle data channels ' +
                 'with `binaryType` set to `arraybuffer`.');
         }
         this.dc = dc;
         this.task = task;
+        this.log = new saltyrtcClient.Log(logLevel);
         this.cookiePair = new saltyrtcClient.CookiePair();
         this.csnPair = new saltyrtcClient.CombinedSequencePair();
 
@@ -138,17 +140,17 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
      * A new chunk arrived.
      */
     private onChunk = (event: MessageEvent) => {
-        console.debug(this.logTag, 'Received chunk');
+        this.log.debug(this.logTag, 'Received chunk');
 
         // If type is not supported, exit immediately
         if (event.data instanceof Blob) {
-            console.warn(this.logTag, 'Received message in blob format, which is not currently supported.');
+            this.log.warn(this.logTag, 'Received message in blob format, which is not currently supported.');
             return;
         } else if (typeof event.data == 'string') {
-            console.warn(this.logTag, 'Received message in string format, which is not currently supported.');
+            this.log.warn(this.logTag, 'Received message in string format, which is not currently supported.');
             return;
         } else if (!(event.data instanceof ArrayBuffer)) {
-            console.warn(this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
+            this.log.warn(this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
             return;
         }
 
@@ -168,7 +170,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
             return;
         }
 
-        console.debug(this.logTag, 'Decrypting incoming data...');
+        this.log.debug(this.logTag, 'Decrypting incoming data...');
 
         // Create a new MessageEvent instance based on the context of the final chunk.
         const realEvent = context[context.length - 1];
@@ -183,8 +185,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         try {
             this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer as ArrayBuffer));
         } catch (e) {
-            console.error(this.logTag, 'Invalid nonce:', e);
-            console.error(this.logTag, 'Closing data channel');
+            this.log.error(this.logTag, 'Invalid nonce:', e);
+            this.log.error(this.logTag, 'Closing data channel');
 
             // Close this data channel
             this.close();

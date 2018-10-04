@@ -39,6 +39,10 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     // Other constants
     private static DC_LABEL = 'saltyrtc-signaling';
 
+    // Logging
+    private log: saltyrtc.Log;
+    private logTag = '[SaltyRTC.WebRTC]';
+
     // Initialization state
     private initialized = false;
 
@@ -54,7 +58,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private doHandover = true;
 
     // Signaling
-    private signaling: saltyrtc.Signaling;
+    private _signaling: saltyrtc.Signaling;
 
     // Data channel
     private sdc: saltyrtc.tasks.webrtc.SecureDataChannel = null;
@@ -67,24 +71,37 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private candidates: saltyrtc.tasks.webrtc.Candidate[] = [];
     private sendCandidatesTimeout: number | null = null;
 
-    // Log tag
-    private get logTag(): string {
-        if (this.signaling === null || this.signaling === undefined) {
-            return '[SaltyRTC.WebRTC]';
-        }
-        return '[SaltyRTC.WebRTC.' + this.signaling.role + ']';
-    }
-
     /**
      * Create a new task instance.
      *
      * @param handover Set this parameter to `false` if you want to disable
      *                 the signaling handover to a secure data channel.
      * @param maxPacketSize The max packet size in bytes for a DataChannel chunk.
+     * @param logLevel The log level. Defaults to `none`.
      */
-    constructor(handover: boolean = true, maxPacketSize: number = WebRTCTask.DEFAULT_MAX_PACKET_SIZE) {
+    constructor(
+        handover: boolean = true,
+        maxPacketSize: number = WebRTCTask.DEFAULT_MAX_PACKET_SIZE,
+        logLevel: saltyrtc.LogLevel = 'none',
+    ) {
+        this.log = new saltyrtcClient.Log(logLevel);
         this.doHandover = handover;
         this.requestedMaxPacketSize = maxPacketSize;
+    }
+
+    /**
+     * Set the current signaling instance.
+     */
+    private set signaling(signaling: saltyrtc.Signaling) {
+        this._signaling = signaling;
+        this.logTag = '[SaltyRTC.WebRTC.' + signaling.role + ']';
+    }
+
+    /**
+     * Get the current signaling instance.
+     */
+    private get signaling(): saltyrtc.Signaling {
+        return this._signaling;
     }
 
     /**
@@ -141,8 +158,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         } else {
             this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
         }
-        console.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize,
-                      'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
+        this.log.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize,
+                        'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
     }
 
     /**
@@ -183,7 +200,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * This method should only be called by the signaling class, not by the end user!
      */
     onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
-        console.debug(this.logTag, 'New task message arrived: ' + message.type);
+        this.log.debug(this.logTag, 'New task message arrived: ' + message.type);
         switch (message.type) {
             case 'offer':
                 if (this.validateOffer(message) !== true) return;
@@ -199,7 +216,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 break;
             case 'handover':
                 if (this.doHandover === false) {
-                    console.error(this.logTag, 'Received unexpected handover message from peer');
+                    this.log.error(this.logTag, 'Received unexpected handover message from peer');
                     this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
                 }
@@ -208,11 +225,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 }
                 this.signaling.handoverState.peer = true;
                 if (this.signaling.handoverState.both) {
-                    console.info(this.logTag, 'Handover to data channel finished');
+                    this.log.info(this.logTag, 'Handover to data channel finished');
                 }
                 break;
             default:
-                console.error(this.logTag, 'Received message with unknown type:', message.type);
+                this.log.error(this.logTag, 'Received message with unknown type:', message.type);
         }
     }
 
@@ -221,11 +238,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     private validateOffer(message: saltyrtc.messages.TaskMessage): boolean {
         if (message['offer'] === undefined) {
-            console.warn(this.logTag, 'Offer message does not contain offer');
+            this.log.warn(this.logTag, 'Offer message does not contain offer');
             return false;
         }
         if (message['offer']['sdp'] === undefined) {
-            console.warn(this.logTag, 'Offer message does not contain offer sdp');
+            this.log.warn(this.logTag, 'Offer message does not contain offer sdp');
             return false;
         }
         return true;
@@ -236,11 +253,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     private validateAnswer(message: saltyrtc.messages.TaskMessage): boolean {
         if (message['answer'] === undefined) {
-            console.warn(this.logTag, 'Answer message does not contain answer');
+            this.log.warn(this.logTag, 'Answer message does not contain answer');
             return false;
         }
         if (message['answer']['sdp'] === undefined) {
-            console.warn(this.logTag, 'Answer message does not contain answer sdp');
+            this.log.warn(this.logTag, 'Answer message does not contain answer sdp');
             return false;
         }
         return true;
@@ -251,25 +268,25 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     private validateCandidates(message: saltyrtc.messages.TaskMessage): boolean {
         if (message['candidates'] === undefined) {
-            console.warn(this.logTag, 'Candidates message does not contain candidates');
+            this.log.warn(this.logTag, 'Candidates message does not contain candidates');
             return false;
         }
         if ((message['candidates'] as any[]).length < 1) {
-            console.warn(this.logTag, 'Candidates message contains empty candidate list');
+            this.log.warn(this.logTag, 'Candidates message contains empty candidate list');
             return false;
         }
         for (let candidate of message['candidates']) {
             if (candidate !== null) {
                 if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
                     return false;
                 }
                 if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
                     return false;
                 }
                 if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
-                    console.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
                     return false;
                 }
             }
@@ -350,7 +367,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Send an offer message to the responder.
      */
     public sendOffer(offer: RTCSessionDescriptionInit): void {
-        console.debug(this.logTag, 'Sending offer');
+        this.log.debug(this.logTag, 'Sending offer');
         try {
             this.signaling.sendTaskMessage({
                 'type': 'offer',
@@ -361,7 +378,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             });
         } catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send offer:', e.message);
+                this.log.error(this.logTag, 'Could not send offer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
@@ -371,7 +388,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Send an answer message to the initiator.
      */
     public sendAnswer(answer: RTCSessionDescriptionInit): void {
-        console.debug(this.logTag, 'Sending answer');
+        this.log.debug(this.logTag, 'Sending answer');
         try {
             this.signaling.sendTaskMessage({
                 'type': 'answer',
@@ -382,7 +399,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             });
         } catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send answer:', e.message);
+                this.log.error(this.logTag, 'Could not send answer:', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
@@ -400,20 +417,20 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     public sendCandidates(candidates: saltyrtc.tasks.webrtc.Candidate[]): void {
         // Add to buffer
-        console.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
+        this.log.debug(this.logTag, 'Buffering', candidates.length, 'candidate(s)');
         this.candidates.push(...candidates);
 
         // Sending function
         const sendFunc = () => {
             try {
-                console.debug(this.logTag, 'Sending', this.candidates.length, 'candidate(s)');
+                this.log.debug(this.logTag, 'Sending', this.candidates.length, 'candidate(s)');
                 this.signaling.sendTaskMessage({
                     'type': 'candidates',
                     'candidates': this.candidates
                 });
             } catch (e) {
                 if (e.name === 'SignalingError') {
-                    console.error(this.logTag, 'Could not send candidates:', e.message);
+                    this.log.error(this.logTag, 'Could not send candidates:', e.message);
                     this.signaling.resetConnection(e.closeCode);
                 }
             } finally {
@@ -437,23 +454,23 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * the SaltyRTC `handover` event.
      */
     public handover(pc: RTCPeerConnection): boolean {
-        console.debug(this.logTag, 'Initiate handover');
+        this.log.debug(this.logTag, 'Initiate handover');
 
         // Make sure this is intended
         if (this.doHandover === false) {
-            console.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
+            this.log.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
             return false;
         }
 
         // Make sure handover hasn't already happened
         if (this.signaling.handoverState.any) {
-            console.error(this.logTag, 'Handover already in progress or finished');
+            this.log.error(this.logTag, 'Handover already in progress or finished');
             return false;
         }
 
         // Make sure the dc id is set
         if (this.sdcId === undefined || this.sdcId === null) {
-            console.error(this.logTag, 'Data channel id not set');
+            this.log.error(this.logTag, 'Data channel id not set');
             this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
             throw new Error('Data channel id not set');
         }
@@ -486,12 +503,12 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         this.sdc.onerror = (ev: Event) => {
             // Log error
-            console.error(this.logTag, 'Signaling data channel error:', ev);
+            this.log.error(this.logTag, 'Signaling data channel error:', ev);
         };
 
         this.sdc.onbufferedamountlow = (ev: Event) => {
             // Log warning
-            console.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
+            this.log.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
         };
 
         this.sdc.onmessage = (ev: MessageEvent) => {
@@ -507,14 +524,14 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Send a handover message to the peer.
      */
     private sendHandover(): void {
-        console.debug(this.logTag, 'Sending handover');
+        this.log.debug(this.logTag, 'Sending handover');
 
         // Send handover message
         try {
             this.signaling.sendTaskMessage({'type': 'handover'});
         } catch (e) {
             if (e.name === 'SignalingError') {
-                console.error(this.logTag, 'Could not send handover message', e.message);
+                this.log.error(this.logTag, 'Could not send handover message', e.message);
                 this.signaling.resetConnection(e.closeCode);
             }
         }
@@ -524,7 +541,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         // Check whether we're done
         if (this.signaling.handoverState.both) {
-            console.info(this.logTag, 'Handover to data channel finished');
+            this.log.info(this.logTag, 'Handover to data channel finished');
         }
     }
 
@@ -537,7 +554,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * @return A `SecureDataChannel` instance.
      */
     public wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel {
-        console.debug(this.logTag, "Wrapping data channel", dc.id);
+        this.log.debug(this.logTag, "Wrapping data channel", dc.id);
         return new SecureDataChannel(dc, this);
     }
 
@@ -547,7 +564,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * @param reason The close code.
      */
     public close(reason: number): void {
-        console.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
+        this.log.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
         if (this.sdc !== null) {
             this.sdc.close();
         }
@@ -604,13 +621,13 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Emit an event.
      */
     private emit(event: saltyrtc.SaltyRTCEvent) {
-        console.debug(this.logTag, 'New event:', event.type);
+        this.log.debug(this.logTag, 'New event:', event.type);
         const handlers = this.eventRegistry.get(event.type);
         for (let handler of handlers) {
             try {
                 this.callHandler(handler, event);
             } catch (e) {
-                console.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
+                this.log.error(this.logTag, 'Unhandled exception in', event.type, 'handler:', e);
             }
         }
     }
