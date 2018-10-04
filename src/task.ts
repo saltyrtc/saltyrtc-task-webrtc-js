@@ -485,7 +485,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         dc.binaryType = 'arraybuffer';
 
         // Wrap data channel
-        this.sdc = new SecureDataChannel(dc, this);
+        this.sdc = new SecureDataChannel(dc, this, this.log.level);
 
         // Attach event handlers
 
@@ -555,7 +555,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     public wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel {
         this.log.debug(this.logTag, "Wrapping data channel", dc.id);
-        return new SecureDataChannel(dc, this);
+        return new SecureDataChannel(dc, this, this.log.level);
     }
 
     /**
