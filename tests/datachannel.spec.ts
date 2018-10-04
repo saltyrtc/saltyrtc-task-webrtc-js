@@ -45,7 +45,7 @@ export default () => { describe('datachannel', function() {
             beforeEach(() => {
                 this.fakeDc = new FakeDataChannel as RTCDataChannel;
                 this.fakeTask = new FakeTask() as WebRTCTask;
-                this.sdc = new SecureDataChannel(this.fakeDc, this.fakeTask);
+                this.sdc = new SecureDataChannel(this.fakeDc, this.fakeTask, 'debug');
             });
 
             it('cannot send strings', () => {
