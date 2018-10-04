@@ -74,37 +74,32 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     /**
      * Encrypt and send a message through the data channel.
      */
-    public send(data: string|Blob|ArrayBuffer|ArrayBufferView): void {
-        // Validate input data
-        let buffer: ArrayBuffer;
-        if (typeof data === 'string') {
-            throw new Error('SecureDataChannel can only handle binary data.');
+    public send(data: string | Blob | ArrayBuffer | ArrayBufferView): void {
+        let view: Uint8Array;
+
+        // It is most likely a Uint8Array, so we check for that first
+        if (data instanceof Uint8Array) {
+            view = data;
+        } else if (data instanceof ArrayBuffer) {
+            // Create a view of the whole buffer (don't copy)
+            view = new Uint8Array(data);
+        } else if (ArrayBuffer.isView(data)) {
+            // Create a view of the other type's view (don't copy)
+            view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
         } else if (data instanceof Blob) {
             throw new Error('SecureDataChannel does not currently support Blob data. ' +
                 'Please pass in an ArrayBuffer or a typed array (e.g. Uint8Array).');
-        } else if (data instanceof Int8Array ||
-            data instanceof Uint8ClampedArray ||
-            data instanceof Int16Array ||
-            data instanceof Uint16Array ||
-            data instanceof Int32Array ||
-            data instanceof Uint32Array ||
-            data instanceof Float32Array ||
-            data instanceof Float64Array ||
-            data instanceof DataView) {
-            const start = data.byteOffset || 0;
-            const end = start + (data.byteLength || data.buffer.byteLength);
-            buffer = data.buffer.slice(start, end) as ArrayBuffer;
-        } else if (data instanceof Uint8Array) {
-            buffer = data.buffer as ArrayBuffer;
-        } else if (data instanceof ArrayBuffer) {
-            buffer = data;
+        } else if (typeof data === 'string') {
+            throw new Error('SecureDataChannel can only handle binary data.');
         } else {
             throw new Error('Unknown data type. Please pass in an ArrayBuffer ' +
                 'or a typed array (e.g. Uint8Array).');
         }
 
         // Encrypt data
-        const box: saltyrtc.Box = this.encryptData(new Uint8Array(buffer));
+        // Note: The encrypted data is stored in a new buffer. Thus, there can be no side effects
+        //       when modifying `data` after the call returned.
+        const box: saltyrtc.Box = this.encryptData(view);
         const encryptedBytes: Uint8Array = box.toUint8Array();
 
         // Split into chunks if desired and send
@@ -132,8 +127,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         const nonce = new DataChannelNonce(this.cookiePair.ours, this.dc.id, csn.overflow, csn.sequenceNumber);
 
         // Encrypt
-        const encrypted = this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
-        return encrypted;
+        return this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
     }
 
     /**
@@ -146,15 +140,13 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         if (event.data instanceof Blob) {
             this.log.warn(this.logTag, 'Received message in blob format, which is not currently supported.');
             return;
-        } else if (typeof event.data == 'string') {
+        } else if (typeof event.data === 'string') {
             this.log.warn(this.logTag, 'Received message in string format, which is not currently supported.');
-            return;
-        } else if (!(event.data instanceof ArrayBuffer)) {
-            this.log.warn(this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
             return;
         }
 
         // Register chunk
+        // Note: `event.data` can only be an ArrayBuffer instance at this point.
         this.unchunker.add(event.data as ArrayBuffer, event);
 
         // Clean up old chunks regularly
