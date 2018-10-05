@@ -56,13 +56,13 @@ export default () => { describe('Integration Tests', function() {
     describe('WebRTCTask', () => {
 
         beforeEach(() => {
-            this.initiatorTask = new WebRTCTask();
+            this.initiatorTask = new WebRTCTask(undefined, undefined, 'info');
             this.initiator = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
                 .usingTasks([this.initiatorTask])
                 .asInitiator() as saltyrtc.SaltyRTC;
-            this.responderTask = new WebRTCTask();
+            this.responderTask = new WebRTCTask(undefined, undefined, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -402,7 +402,7 @@ export default () => { describe('Integration Tests', function() {
         });
 
         it('cannot do handover if disabled via constructor', async (done) => {
-            this.responderTask = new WebRTCTask(false);
+            this.responderTask = new WebRTCTask(false, undefined, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -415,13 +415,13 @@ export default () => { describe('Integration Tests', function() {
         });
 
         it('can safely increase the chunk size', async (done) => {
-            this.initiatorTask = new WebRTCTask(true, 65536);
+            this.initiatorTask = new WebRTCTask(true, 65536, 'info');
             this.initiator = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
                 .usingTasks([this.initiatorTask])
                 .asInitiator() as saltyrtc.SaltyRTC;
-            this.responderTask = new WebRTCTask(true, 65536);
+            this.responderTask = new WebRTCTask(true, 65536, 'info');
             this.responder = new SaltyRTCBuilder()
                 .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                 .withKeyStore(new KeyStore())
@@ -460,6 +460,58 @@ export default () => { describe('Integration Tests', function() {
             done();
         });
 
+        it('fires the "bufferedamountlow" event', async (done) => {
+            let connections: {
+                initiator: RTCPeerConnection,
+                responder: RTCPeerConnection,
+            } = await setupPeerConnection.bind(this)();
+
+            let testWithSize = (dataBytes) => {
+                return new Promise((resolve, reject) => {
+                    connections.responder.ondatachannel = (e: RTCDataChannelEvent) => {
+                        e.channel.binaryType = 'arraybuffer';
+                        const wrapped = this.responderTask.wrapDataChannel(e.channel);
+                        wrapped.bufferedAmountLowThreshold = 0;
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            reject(`Other data channel's "bufferedamountlow" event shall not fire`);
+                        };
+                    };
+                    let dc = connections.initiator.createDataChannel('dc');
+                    dc.binaryType = 'arraybuffer';
+                    const wrapped = this.initiatorTask.wrapDataChannel(dc);
+                    wrapped.bufferedAmountLowThreshold = Math.min(dataBytes, 1024 * 777);
+                    wrapped.onbufferedamountlow = (e: Event) => {
+                        console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                        expect(wrapped.bufferedAmount).not.toBeGreaterThan(wrapped.bufferedAmountLowThreshold);
+                        resolve();
+                    };
+
+                    // Send
+                    wrapped.send(nacl.randomBytes(dataBytes));
+                });
+            };
+
+            await testWithSize(1024 * 16); // 16 KiB
+            console.info('16 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 256); // 256 KiB
+            console.info('256 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 777); // 777 KiB
+            console.info('777 KiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024); // 1 MiB
+            console.info('1 MiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024 * 2); // 2 MiB
+            console.info('2 MiB bufferedamountlow test done');
+
+            await testWithSize(1024 * 1024 * 10); // 10 MiB
+            console.info('10 MiB bufferedamountlow test done');
+
+            done();
+        });
+
         it('can send large files (serial)', async (done) => {
             let connections: {
                 initiator: RTCPeerConnection,
@@ -474,9 +526,12 @@ export default () => { describe('Integration Tests', function() {
                         wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
                         wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
                         wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                        };
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
-                            resolve();
+                            resolve()
                         }
                     };
                     let dc = connections.initiator.createDataChannel('dc' + dataBytes);
@@ -485,6 +540,9 @@ export default () => { describe('Integration Tests', function() {
                     wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
                     wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
                     wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                    wrapped.onbufferedamountlow = (e: Event) => {
+                        console.debug('Data channel', wrapped.label, 'bufferedamountlow:', e);
+                    };
                     wrapped.send(nacl.randomBytes(dataBytes));
                 });
             };
@@ -516,6 +574,9 @@ export default () => { describe('Integration Tests', function() {
                         wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
                         wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
                         wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'buferedamountlow:', e);
+                        };
                         wrapped.onmessage = (m: MessageEvent) => {
                             expect(m.data.byteLength).toEqual(dataBytes);
                             done += 1;
@@ -535,6 +596,9 @@ export default () => { describe('Integration Tests', function() {
                         wrapped.onopen = (e: Event) => console.debug('Data channel', wrapped.label, 'open');
                         wrapped.onerror = (e: Event) => console.debug('Data channel', wrapped.label, 'error:', e);
                         wrapped.onclose = (e: Event) => console.debug('Data channel', wrapped.label, 'closed:', e);
+                        wrapped.onbufferedamountlow = (e: Event) => {
+                            console.debug('Data channel', wrapped.label, 'buferedamountlow:', e);
+                        };
                         console.info('Sending', dataBytes / 1024 / 1024, 'MiB of random data');
                         wrapped.send(data);
                     }

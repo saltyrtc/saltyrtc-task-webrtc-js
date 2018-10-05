@@ -17,6 +17,8 @@ const CHUNK_HEADER_LENGTH = 9;
 
 class FakeDataChannel {
     public binaryType = 'arraybuffer';
+    public bufferedAmountLowThreshold = 0;
+    public bufferedAmount = 0;
 }
 
 class FakeSignaling {
