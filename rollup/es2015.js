@@ -12,7 +12,7 @@ export default {
     ],
     external: ['@saltyrtc/client', 'tweetnacl'],
     output: {
-        file: 'dist/saltyrtc-task-webrtc.es2015.js',
+        file: 'dist/saltyrtc-task-webrtc-v2.es2015.js',
         format: 'es',
         sourceMap: true,
         banner: "/**\n" +

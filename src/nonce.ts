@@ -7,6 +7,8 @@
 
 /// <reference types="@saltyrtc/client" />
 
+import {ValidationError} from "./exception";
+
 /**
  * A SaltyRTC data channel nonce.
  *
@@ -20,41 +22,43 @@
  * - Q: Sequence number (4 bytes)
  */
 export class DataChannelNonce {
-    private _cookie: saltyrtc.Cookie;
-    private _overflow: number;
-    private _sequenceNumber: number;
-    private _channelId: number;
+    public readonly cookie: saltyrtc.Cookie;
+    public readonly overflow: number;
+    public readonly sequenceNumber: number;
+    public readonly channelId: number;
 
     public static TOTAL_LENGTH = 24;
 
     constructor(cookie: saltyrtc.Cookie, channelId: number, overflow: number, sequenceNumber: number) {
-        this._cookie = cookie;
-        this._overflow = overflow;
-        this._sequenceNumber = sequenceNumber;
-        this._channelId = channelId;
+        this.cookie = cookie;
+        this.overflow = overflow;
+        this.sequenceNumber = sequenceNumber;
+        this.channelId = channelId;
     }
 
-    get cookie() { return this._cookie; }
-    get overflow() { return this._overflow; }
-    get sequenceNumber() { return this._sequenceNumber; }
-    get combinedSequenceNumber() { return (this._overflow << 32) + this._sequenceNumber; }
-    get channelId() { return this._channelId; }
+    /**
+     * Get the combined sequence number (from the sequence number and the
+     * overflow number).
+     */
+    public get combinedSequenceNumber() {
+        return (this.overflow * (2 ** 32)) + this.sequenceNumber;
+    }
 
     /**
-     * Create a nonce from an ArrayBuffer.
+     * Create a nonce from a Uint8Array.
      *
-     * If packet is not exactly 24 bytes long, throw an exception.
+     * If `data` is not exactly 24 bytes in size, throw a `ValidationError`.
      */
-    public static fromArrayBuffer(packet: ArrayBuffer): DataChannelNonce {
-        if (packet.byteLength != DataChannelNonce.TOTAL_LENGTH) {
-            throw 'bad-packet-length';
+    public static fromUint8Array(data: Uint8Array): DataChannelNonce {
+        if (data.byteLength !== this.TOTAL_LENGTH) {
+            throw new ValidationError('bad-packet-length');
         }
 
         // Get view to buffer
-        const view = new DataView(packet);
+        const view = new DataView(data.buffer, data.byteOffset, this.TOTAL_LENGTH);
 
         // Parse and return nonce
-        const cookie = new saltyrtcClient.Cookie(new Uint8Array(packet, 0, 16));
+        const cookie = new saltyrtcClient.Cookie(new Uint8Array(data.buffer, data.byteOffset, this.TOTAL_LENGTH));
         const channelId = view.getUint16(16);
         const overflow = view.getUint16(18);
         const sequenceNumber = view.getUint32(20);
@@ -63,27 +67,18 @@ export class DataChannelNonce {
     }
 
     /**
-     * Return an ArrayBuffer containing the nonce data.
-     */
-    public toArrayBuffer(): ArrayBuffer {
-        const buf = new ArrayBuffer(DataChannelNonce.TOTAL_LENGTH);
-
-        const uint8view = new Uint8Array(buf);
-        uint8view.set(this._cookie.bytes);
-
-        const view = new DataView(buf);
-        view.setUint16(16, this._channelId);
-        view.setUint16(18, this._overflow);
-        view.setUint32(20, this._sequenceNumber);
-
-        return buf;
-    }
-
-    /**
-     * Return an Uint8Array containing the nonce data.
+     * Return a Uint8Array containing the nonce data.
      */
     public toUint8Array(): Uint8Array {
-        return new Uint8Array(this.toArrayBuffer());
+        const buffer = new Uint8Array(DataChannelNonce.TOTAL_LENGTH);
+        buffer.set(this.cookie.bytes);
+
+        const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        view.setUint16(16, this.channelId);
+        view.setUint16(18, this.overflow);
+        view.setUint32(20, this.sequenceNumber);
+
+        return buffer;
     }
 
 }
