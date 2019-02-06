@@ -169,17 +169,13 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
           _this.log.warn(_this.logTag, 'Received message in blob format, which is not currently supported.');
 
           return;
-        } else if (typeof event.data == 'string') {
+        } else if (typeof event.data === 'string') {
           _this.log.warn(_this.logTag, 'Received message in string format, which is not currently supported.');
-
-          return;
-        } else if (!(event.data instanceof ArrayBuffer)) {
-          _this.log.warn(_this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
 
           return;
         }
 
-        _this.unchunker.add(event.data, event);
+        _this.unchunker.add(new Uint8Array(event.data));
 
         if (_this.chunkCount++ > SecureDataChannel.CHUNK_COUNT_GC) {
           _this.unchunker.gc(SecureDataChannel.CHUNK_MAX_AGE);
@@ -188,19 +184,12 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
         }
       };
 
-      this.onEncryptedMessage = function (data, context) {
+      this.onEncryptedMessage = function (data) {
         if (_this._onmessage === undefined) {
           return;
         }
 
         _this.log.debug(_this.logTag, 'Decrypting incoming data...');
-
-        var realEvent = context[context.length - 1];
-        var fakeEvent = {};
-
-        for (var x in realEvent) {
-          fakeEvent[x] = realEvent[x];
-        }
 
         var box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
 
@@ -220,7 +209,9 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
 
         var decrypted = _this.task.getSignaling().decryptFromPeer(box);
 
-        fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
+        var fakeEvent = {
+          data: decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength)
+        };
 
         _this._onmessage.bind(_this.dc)(fakeEvent);
       };
@@ -242,10 +233,11 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
 
       if (this.chunkSize === 0) {
         this.dc.onmessage = function (event) {
-          return _this.onEncryptedMessage(event.data, [event]);
+          return _this.onEncryptedMessage(event.data);
         };
       } else {
-        this.unchunker = new chunkedDc.Unchunker();
+        this.chunkBuffer = new ArrayBuffer(this.chunkSize);
+        this.unchunker = new chunkedDc.UnreliableUnorderedUnchunker();
         this.unchunker.onMessage = this.onEncryptedMessage;
         this.dc.onmessage = this.onChunk;
       }
@@ -254,31 +246,29 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
     _createClass(SecureDataChannel, [{
       key: "send",
       value: function send(data) {
-        var buffer;
+        var view;
 
-        if (typeof data === 'string') {
-          throw new Error('SecureDataChannel can only handle binary data.');
+        if (data instanceof Uint8Array) {
+          view = data;
+        } else if (data instanceof ArrayBuffer) {
+          view = new Uint8Array(data);
+        } else if (ArrayBuffer.isView(data)) {
+          view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
         } else if (data instanceof Blob) {
           throw new Error('SecureDataChannel does not currently support Blob data. ' + 'Please pass in an ArrayBuffer or a typed array (e.g. Uint8Array).');
-        } else if (data instanceof Int8Array || data instanceof Uint8ClampedArray || data instanceof Int16Array || data instanceof Uint16Array || data instanceof Int32Array || data instanceof Uint32Array || data instanceof Float32Array || data instanceof Float64Array || data instanceof DataView) {
-          var start = data.byteOffset || 0;
-          var end = start + (data.byteLength || data.buffer.byteLength);
-          buffer = data.buffer.slice(start, end);
-        } else if (data instanceof Uint8Array) {
-          buffer = data.buffer;
-        } else if (data instanceof ArrayBuffer) {
-          buffer = data;
+        } else if (typeof data === 'string') {
+          throw new Error('SecureDataChannel can only handle binary data.');
         } else {
           throw new Error('Unknown data type. Please pass in an ArrayBuffer ' + 'or a typed array (e.g. Uint8Array).');
         }
 
-        var box = this.encryptData(new Uint8Array(buffer));
+        var box = this.encryptData(view);
         var encryptedBytes = box.toUint8Array();
 
         if (this.chunkSize === 0) {
           this.dc.send(encryptedBytes);
         } else {
-          var chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+          var chunker = new chunkedDc.UnreliableUnorderedChunker(this.messageNumber++, encryptedBytes, this.chunkSize, this.chunkBuffer);
           var _iteratorNormalCompletion = true;
           var _didIteratorError = false;
           var _iteratorError = undefined;
@@ -309,8 +299,7 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
       value: function encryptData(data) {
         var csn = this.csnPair.ours.next();
         var nonce = new DataChannelNonce(this.cookiePair.ours, this.dc.id, csn.overflow, csn.sequenceNumber);
-        var encrypted = this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
-        return encrypted;
+        return this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
       }
     }, {
       key: "validateNonce",
@@ -874,7 +863,7 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
           protocol: WebRTCTask.PROTOCOL_NAME
         });
         dc.binaryType = 'arraybuffer';
-        this.sdc = new SecureDataChannel(dc, this);
+        this.sdc = new SecureDataChannel(dc, this, this.log.level);
 
         this.sdc.onopen = function (ev) {
           _this2.sendHandover();
@@ -928,7 +917,7 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
       key: "wrapDataChannel",
       value: function wrapDataChannel(dc) {
         this.log.debug(this.logTag, "Wrapping data channel", dc.id);
-        return new SecureDataChannel(dc, this);
+        return new SecureDataChannel(dc, this, this.log.level);
       }
     }, {
       key: "close",
