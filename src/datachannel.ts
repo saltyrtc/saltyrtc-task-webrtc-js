@@ -38,7 +38,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
     private chunkSize;
     private messageNumber = 0;
     private chunkCount = 0;
-    private unchunker: chunkedDc.Unchunker;
+    private chunkBuffer: ArrayBuffer;
+    private unchunker: chunkedDc.UnreliableUnorderedUnchunker;
 
     // SaltyRTC
     private cookiePair: saltyrtc.CookiePair;
@@ -63,9 +64,10 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Incoming dc messages are handled depending on the negotiated chunk size
         if (this.chunkSize === 0) {
-            this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data, [event]);
+            this.dc.onmessage = (event: MessageEvent) => this.onEncryptedMessage(event.data);
         } else {
-            this.unchunker = new chunkedDc.Unchunker();
+            this.chunkBuffer = new ArrayBuffer(this.chunkSize);
+            this.unchunker = new chunkedDc.UnreliableUnorderedUnchunker();
             this.unchunker.onMessage = this.onEncryptedMessage;
             this.dc.onmessage = this.onChunk;
         }
@@ -106,7 +108,8 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         if (this.chunkSize === 0) {
             this.dc.send(encryptedBytes);
         } else {
-            const chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
+            const chunker = new chunkedDc.UnreliableUnorderedChunker(
+                this.messageNumber++, encryptedBytes, this.chunkSize, this.chunkBuffer);
             for (let chunk of chunker) {
                 this.dc.send(chunk);
             }
@@ -147,7 +150,7 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
         // Register chunk
         // Note: `event.data` can only be an ArrayBuffer instance at this point.
-        this.unchunker.add(event.data as ArrayBuffer, event);
+        this.unchunker.add(new Uint8Array(event.data as ArrayBuffer));
 
         // Clean up old chunks regularly
         if (this.chunkCount++ > SecureDataChannel.CHUNK_COUNT_GC) {
@@ -156,21 +159,12 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
         }
     };
 
-    private onEncryptedMessage = (data: Uint8Array, context: MessageEvent[]) => {
+    private onEncryptedMessage = (data: Uint8Array) => {
         // If _onmessage is not defined, exit immediately.
         if (this._onmessage === undefined) {
             return;
         }
-
         this.log.debug(this.logTag, 'Decrypting incoming data...');
-
-        // Create a new MessageEvent instance based on the context of the final chunk.
-        const realEvent = context[context.length - 1];
-        const fakeEvent = {};
-        for (let x in realEvent) {
-            fakeEvent[x] = realEvent[x];
-        }
-
         const box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
 
         // Validate nonce
@@ -185,13 +179,14 @@ export class SecureDataChannel implements saltyrtc.tasks.webrtc.SecureDataChanne
 
             // Close the signaling as well
             this.task.close(saltyrtcClient.CloseCode.ProtocolError);
-
             return;
         }
 
-        // Overwrite data with decoded data
+        // Create a fake MessageEvent where there's only the 'data' attribute
         const decrypted = this.task.getSignaling().decryptFromPeer(box);
-        fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
+        const fakeEvent = {
+            data: decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength)
+        };
 
         // Call original handler
         this._onmessage.bind(this.dc)(fakeEvent);
