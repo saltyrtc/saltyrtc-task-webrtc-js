@@ -59,7 +59,8 @@ export class DataChannelNonce {
         const view = new DataView(data.buffer, data.byteOffset, this.TOTAL_LENGTH);
 
         // Parse and return nonce
-        const slice = new Uint8Array(data.buffer, data.byteOffset, this.TOTAL_LENGTH);
+        const slice = new Uint8Array(
+            data.buffer, data.byteOffset, saltyrtcClient.Cookie.COOKIE_LENGTH);
         const cookie = new saltyrtcClient.Cookie(slice);
         const channelId = view.getUint16(16);
         const overflow = view.getUint16(18);
