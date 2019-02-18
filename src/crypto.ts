@@ -79,15 +79,19 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
             throw new ValidationError('Remote cookie changed');
         }
 
-        // Make sure that two consecutive incoming messages do not have the exact same CSN
+        // Make sure that two consecutive incoming messages do not have the
+        // exact same CSN.
+        //
+        // Note: This very loose check ensures that unreliable/unordered data
+        //       channels do not break.
         if (this.lastIncomingCsn !== null &&
             nonce.combinedSequenceNumber === this.lastIncomingCsn) {
-            throw new ValidationError('CSN reuse detected!');
+            throw new ValidationError('CSN reuse detected');
         }
 
         // Validate data channel id
         if (nonce.channelId !== this.channelId) {
-            const error = 'Data channel id in nonce does not match actual data channel id';
+            const error = 'Data channel id in nonce does not match';
             throw new ValidationError(error);
         }
 
