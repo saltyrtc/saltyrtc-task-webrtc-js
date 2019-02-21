@@ -35,7 +35,7 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "@saltyrtc/chunked-dc": "https://github.com/saltyrtc/chunked-dc-js.git#v2-rc1"
+    "@saltyrtc/chunked-dc": "https://github.com/saltyrtc/chunked-dc-js.git#v2-rc2"
   },
   "peerDependencies": {
     "@saltyrtc/client": "^0.14.0",

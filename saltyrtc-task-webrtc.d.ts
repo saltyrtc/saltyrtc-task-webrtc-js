@@ -45,36 +45,40 @@ declare namespace saltyrtc.tasks.webrtc {
      */
     interface SignalingTransportHandler {
         /**
-         * The maximum amount of bytes that can be sent in a single message.
+         * Will be called to retrieve the maximum amount of bytes that can be
+         * sent in a single message.
          */
         readonly maxMessageSize: number;
 
         /**
-         * Must be called when data has been received on the underlying data
+         * MUST be called when data has been received on the underlying data
          * channel.
          *
          * @param message A signalling message whose content SHALL NOT be
-         *   modified by the application before dispatching it.
+         *   modified by the application before dispatching it. The application
+         *   MUST consider the message as transferred after calling this.
          */
         onmessage: (message: Uint8Array) => void;
 
         /**
-         * MUST be fired when the underlying data channel has moved into the
+         * MUST be called when the underlying data channel has moved into the
          * `closed` state.
          */
         onclose: () => void;
 
         /**
-         * Start the closing procedure of the underlying data channel.
+         * Will be called to start the closing procedure of the underlying data
+         * channel.
          */
         close(): void;
 
         /**
-         * Send the signalling message on a data channel.
+         * Will be called to send a signalling message on a data channel.
          *
          * @param message A signalling message that SHALL NOT be modified
          *   or reordered by the application. It is already encrypted and
-         *   obeys `maxMessageSize`.
+         *   obeys `maxMessageSize`. Note that `message` MUST be immediately
+         *   handled or copied since the underlying buffer will be reused.
          */
         send(message: Uint8Array): void;
     }
