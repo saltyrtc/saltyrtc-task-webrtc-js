@@ -82,6 +82,7 @@ export class SignalingTransport {
     private onClose(): void {
         // If handover has already happened, set the signalling state to closed
         this.log.info('Closed (remote)');
+        this.unbind();
         if (this.signaling.handoverState.any) {
             this.signaling.setState('closed');
         }
@@ -90,11 +91,17 @@ export class SignalingTransport {
     /**
      * Called when a chunk has been received on the underlying data channel.
      *
-     * @param chunk The chunk.
+     * @param chunk The chunk. Note that the chunk MUST be considered
+     *   transferred.
      */
     private onChunk(chunk: Uint8Array): void {
         this.log.debug(this.logTag, 'Received chunk');
-        this.unchunker.add(chunk);
+        try {
+            this.unchunker.add(chunk);
+        } catch (error) {
+            this.log.error(this.logTag, 'Invalid chunk:', error);
+            return this.die();
+        }
     }
 
     /**
@@ -112,35 +119,11 @@ export class SignalingTransport {
             message = this.crypto.decrypt(box)
         } catch (error) {
             this.log.error(this.logTag, 'Invalid nonce:', error);
-            this.log.warn(this.logTag, 'Closing data channel');
-
-            // Close (implicitly closes the data channel as well)
-            this.task.close(saltyrtcClient.CloseCode.ProtocolError);
-            return;
+            return this.die();
         }
 
         // Process message
         this.signaling.onSignalingPeerMessage(message);
-    }
-
-    /**
-     * Close the underlying data channel and unbind from all events.
-     *
-     * Note: This is the final state of the transport instance. No further
-     *       events will be emitted to either the task or the signalling
-     *       instance after this method returned.
-     */
-    public close(): void {
-        // Close data channel
-        this.dc.close();
-        this.log.info('Closed (local)');
-
-        // Unbind transport handler events
-        this.dc.onclose = undefined;
-        this.dc.onmessage = undefined;
-
-        // Unbind unchunker events
-        this.unchunker.onMessage = undefined;
     }
 
     /**
@@ -164,7 +147,52 @@ export class SignalingTransport {
         for (let chunk of chunker) {
             // Send chunk
             this.log.debug(this.logTag, 'Sending chunk');
-            this.dc.send(chunk);
+            try {
+                this.dc.send(chunk);
+            } catch (error) {
+                this.log.error(this.logTag, 'Unable to send chunk:', error);
+                return this.die();
+            }
         }
+    }
+
+    /**
+     * Close the underlying data channel and unbind from all events.
+     *
+     * Note: This is the final state of the transport instance. No further
+     *       events will be emitted to either the task or the signalling
+     *       instance after this method returned.
+     */
+    public close(): void {
+        // Close data channel
+        try {
+            this.dc.close();
+        } catch (error) {
+            this.log.error(this.logTag, 'Unable to close data channel:', error);
+        }
+        this.log.info('Closed (local)');
+        this.unbind();
+    }
+
+    /**
+     * Closes the task abruptly due to a protocol error.
+     */
+    private die() {
+        this.log.warn(this.logTag, 'Closing task due to an error');
+
+        // Close (implicitly closes the data channel as well)
+        this.task.close(saltyrtcClient.CloseCode.ProtocolError);
+    }
+
+    /**
+     * Unbind from all events.
+     */
+    private unbind(): void {
+        // Unbind transport handler events
+        this.dc.onclose = undefined;
+        this.dc.onmessage = undefined;
+
+        // Unbind unchunker events
+        this.unchunker.onMessage = undefined;
     }
 }
