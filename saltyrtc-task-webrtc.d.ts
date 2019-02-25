@@ -8,7 +8,6 @@
 /// <reference types="@saltyrtc/client" />
 
 declare namespace saltyrtc.tasks.webrtc {
-
     type Offer = RTCSessionDescriptionInit;
     type Answer = RTCSessionDescriptionInit;
     type Candidate = RTCIceCandidateInit | null;
@@ -42,6 +41,9 @@ declare namespace saltyrtc.tasks.webrtc {
      * An implementation of this handler must be provided by the application
      * in order to hand over a signalling channel to a dedicated data channel
      * controlled by the application.
+     *
+     * It contains a collection of functions called by the task to communicate
+     * with the dedicated data channel.
      */
     interface SignalingTransportHandler {
         /**
@@ -51,29 +53,13 @@ declare namespace saltyrtc.tasks.webrtc {
         readonly maxMessageSize: number;
 
         /**
-         * MUST be called when data has been received on the underlying data
-         * channel.
-         *
-         * @param message A signalling message whose content SHALL NOT be
-         *   modified by the application before dispatching it. The application
-         *   MUST consider the message as transferred after calling this.
-         */
-        onmessage: (message: Uint8Array) => void;
-
-        /**
-         * MUST be called when the underlying data channel has moved into the
-         * `closed` state.
-         */
-        onclose: () => void;
-
-        /**
          * Will be called to start the closing procedure of the underlying data
          * channel.
          */
         close(): void;
 
         /**
-         * Will be called to send a signalling message on a data channel.
+         * Will be called to send a message on the underlying data channel.
          *
          * @param message A signalling message that SHALL NOT be modified
          *   or reordered by the application. It is already encrypted and
@@ -84,40 +70,56 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     /**
-     * This is a factory for the `SignalingTransportHandler` that must be
-     * provided by the application in case it wants to hand over a
-     * signalling channel by following the below procedure.
+     * Will be provided by the task and contains all necessary information
+     * needed to create a dedicated data channel for the purpose of exchanging
+     * signalling data.
      *
-     * The application MUST create an `RTCDataChannel` instance and with the
-     * following properties:
-     *
-     * - `negotiated` must be `true`,
-     * - `ordered` must be `true`, and
-     * - further properties are `label`, `id` and `protocol` as passed to
-     *   the constructor which SHALL NOT be modified by the application.
-     *
-     * Once the `RTCDataChannel` instance moves into the `open` state, the
-     * channel SHALL be bound to an instance of a `SignalingTransportHandler`
-     * that resolves the promise.
-     * In case the `RTCDataChannel` instance moves into the `closed` state or
-     * errors, the promise must be rejected with an optional error
-     * description.
-     *
-     * @param label The label to be used for creating the associated
-     *   `RTCDataChannel`.
-     * @param id The id to be used for creating the associated
-     *   `RTCDataChannel`.
-     * @param protocol The protocol to be used for creating the associated
-     *   `RTCDataChannel`.
+     * It also contains a collection of functions that must be called by the
+     * application to forward messages and events from the dedicated data
+     * channel to the task.
      */
-    type SignalingTransportFactory =
-        (label: string, channelId: number, protocol: string) => Promise<SignalingTransportHandler>;
+    interface SignalingTransportLink {
+        /**
+         * Must be used as `label` argument when creating the `RTCDataChannel`.
+         */
+        readonly label: string;
+
+        /**
+         * Must be used as `id` property as part of the `RTCDataChannelInit`
+         * passed for construction of an `RTCDataChannel`.
+         */
+        readonly id: number;
+
+        /**
+         * Must be used as `protocol` property as part of the
+         * `RTCDataChannelInit` passed for construction of an `RTCDataChannel`.
+         */
+        readonly protocol: string;
+
+        /**
+         * Must be called when the underlying data channel has moved into the
+         * `closed` state.
+         */
+        closed(): void;
+
+        /**
+         * Must be called when a message has been received on the underlying
+         * data channel.
+         *
+         * @param message A signalling message whose content SHALL NOT be
+         *   modified by the application before dispatching it. The application
+         *   MUST consider the message as transferred after calling this.
+         */
+        receive(message: Uint8Array): void;
+    }
 
     interface WebRTCTask extends saltyrtc.Task {
         sendOffer(offer: RTCSessionDescriptionInit): void;
         sendAnswer(answer: RTCSessionDescriptionInit): void;
         sendCandidate(candidate: Candidate): void;
         sendCandidates(candidates: Candidate[]): void;
+        getTransportLink(): SignalingTransportLink;
+        handover(handler: SignalingTransportHandler): void;
         getCryptoContext(channelId: number): DataChannelCryptoContext;
 
         // Events
@@ -127,7 +129,7 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     interface WebRTCTaskStatic {
-        new(handover?: SignalingTransportFactory, logLevel?: saltyrtc.LogLevel): WebRTCTask;
+        new(handover?: boolean, logLevel?: saltyrtc.LogLevel): WebRTCTask;
     }
 
     interface OfferEvent extends saltyrtc.SaltyRTCEvent {

@@ -9,8 +9,63 @@
 /// <reference types="@saltyrtc/chunked-dc" />
 
 /**
- * Wrapper around an `SignalingTransportHandler` instance which replaces the
- * original signalling transport.
+ * Contains all necessary information needed to create a dedicated data channel
+ * for the purpose of exchanging signalling data and to forward messages and
+ * events back to the task.
+ */
+export class SignalingTransportLink implements saltyrtc.tasks.webrtc.SignalingTransportLink {
+    // Channel info
+    // noinspection JSUnusedGlobalSymbols
+    public readonly label = 'saltyrtc-signaling';
+    public readonly id: number;
+    public readonly protocol: string;
+
+    /**
+     * Called by the application when the dedicated data channel moved into
+     * the `closed` state.
+     */
+    public closed: () => void;
+
+    /**
+     * Called by the application when a message has been received on the
+     * dedicated data channel.
+     *
+     * Note: The signalling `message` can be considered transferred.
+     */
+    public receive: (message: Uint8Array) => void;
+
+    /**
+     * Create an untied transport link.
+     *
+     * @param id to be used when creating the data channel
+     * @param protocol to be used when creating the data channel.
+     */
+    public constructor(id: number, protocol: string) {
+        this.id = id;
+        this.protocol = protocol;
+        this.untie();
+    }
+
+    /**
+     * Untie the link from a `SignalingTransport` instance.
+     */
+    public untie() {
+        this.closed = () => { throw new Error('closed: Not tied to a SignalingTransport'); };
+        this.receive = () => { throw new Error('receive: Not tied to a SignalingTransport'); };
+    }
+
+    /**
+     * Tie the link to a `SignalingTransport` instance.
+     */
+    public tie(transport: SignalingTransport) {
+        this.closed = transport.closed.bind(transport);
+        this.receive = transport.receiveChunk.bind(transport);
+    }
+}
+
+/**
+ * Replaces the original signalling transport by binding to both the task's
+ * `SignalingTransportLink` and the application's `SignalingTransportHandler`.
  *
  * This class handles the encryption and decryption as well as nonce
  * validation and chunking/unchunking.
@@ -21,7 +76,8 @@ export class SignalingTransport {
     private logTag = '[SaltyRTC.WebRTC.SignalingTransport]';
 
     // Underlying data channel and associated instances
-    private readonly dc: saltyrtc.tasks.webrtc.SignalingTransportHandler;
+    private readonly link: SignalingTransportLink;
+    private readonly handler: saltyrtc.tasks.webrtc.SignalingTransportHandler;
     private readonly task: saltyrtc.tasks.webrtc.WebRTCTask;
     private readonly signaling: saltyrtc.Signaling;
     private readonly crypto: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
@@ -35,8 +91,8 @@ export class SignalingTransport {
     /**
      * Create a new signaling transport.
      *
-     * @param dc The signaling transport handler this transport is being tied
-     *   to.
+     * @param link The signalling transport link of the task.
+     * @param handler The signalling transport handler of the application.
      * @param task The WebRTC task instance.
      * @param signaling The signaling instance.
      * @param crypto A crypto context associated to the signaling transport's
@@ -45,7 +101,8 @@ export class SignalingTransport {
      * @param maxChunkLength The maximum amount of bytes used for a chunk.
      */
     constructor(
-        dc: saltyrtc.tasks.webrtc.SignalingTransportHandler,
+        link: SignalingTransportLink,
+        handler: saltyrtc.tasks.webrtc.SignalingTransportHandler,
         task: saltyrtc.tasks.webrtc.WebRTCTask,
         signaling: saltyrtc.Signaling,
         crypto: saltyrtc.tasks.webrtc.DataChannelCryptoContext,
@@ -53,11 +110,12 @@ export class SignalingTransport {
         maxChunkLength: number,
     ) {
         this.log = new saltyrtcClient.Log(logLevel);
-        this.dc = dc;
+        this.link = link;
+        this.handler = handler;
         this.task = task;
         this.signaling = signaling;
         this.crypto = crypto;
-        this.chunkLength = Math.min(this.dc.maxMessageSize, maxChunkLength);
+        this.chunkLength = Math.min(this.handler.maxMessageSize, maxChunkLength);
         this.chunkBuffer = new ArrayBuffer(this.chunkLength);
 
         // Create unchunker and bind events
@@ -66,20 +124,19 @@ export class SignalingTransport {
         //       However, garbage collection is unnecessary since the channel must still be
         //       reliable and ordered.
         this.unchunker = new chunkedDc.UnreliableUnorderedUnchunker();
-        this.unchunker.onMessage = this.onMessage.bind(this);
+        this.unchunker.onMessage = this.receiveMessage.bind(this);
 
-        // Bind transport handler events
-        this.dc.onclose = this.onClose.bind(this);
-        this.dc.onmessage = this.onChunk.bind(this);
+        // Tie to transport link
+        this.link.tie(this);
 
         // Done
-        this.log.info('Signaling transport established');
+        this.log.info(this.logTag, 'Signaling transport established');
     }
 
     /**
      * Called when the underlying data channel has been closed.
      */
-    private onClose(): void {
+    public closed(): void {
         // If handover has already happened, set the signalling state to closed
         this.log.info('Closed (remote)');
         this.unbind();
@@ -94,7 +151,7 @@ export class SignalingTransport {
      * @param chunk The chunk. Note that the chunk MUST be considered
      *   transferred.
      */
-    private onChunk(chunk: Uint8Array): void {
+    public receiveChunk(chunk: Uint8Array): void {
         this.log.debug(this.logTag, 'Received chunk');
         try {
             this.unchunker.add(chunk);
@@ -110,7 +167,7 @@ export class SignalingTransport {
      *
      * @param message The reassembled message.
      */
-    private onMessage(message: Uint8Array): void {
+    private receiveMessage(message: Uint8Array): void {
         this.log.debug(this.logTag, 'Received message');
 
         // Decrypt message
@@ -148,7 +205,7 @@ export class SignalingTransport {
             // Send chunk
             this.log.debug(this.logTag, 'Sending chunk');
             try {
-                this.dc.send(chunk);
+                this.handler.send(chunk);
             } catch (error) {
                 this.log.error(this.logTag, 'Unable to send chunk:', error);
                 return this.die();
@@ -166,7 +223,7 @@ export class SignalingTransport {
     public close(): void {
         // Close data channel
         try {
-            this.dc.close();
+            this.handler.close();
         } catch (error) {
             this.log.error(this.logTag, 'Unable to close data channel:', error);
         }
@@ -188,9 +245,8 @@ export class SignalingTransport {
      * Unbind from all events.
      */
     private unbind(): void {
-        // Unbind transport handler events
-        this.dc.onclose = undefined;
-        this.dc.onmessage = undefined;
+        // Untie from transport link
+        this.link.untie();
 
         // Unbind unchunker events
         this.unchunker.onMessage = undefined;
