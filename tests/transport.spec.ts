@@ -6,7 +6,6 @@
  */
 
 /// <reference path="jasmine.d.ts" />
-import {Box} from "@saltyrtc/client";
 import {DataChannelNonce} from "../src/nonce";
 import {DataChannelCryptoContext} from "../src/crypto";
 import {SignalingTransport, SignalingTransportLink} from "../src/transport";
@@ -39,7 +38,7 @@ class FakeSignaling {
     // noinspection JSMethodCanBeStatic
     public encryptForPeer(data: Uint8Array, nonce: Uint8Array): saltyrtc.Box {
         // Don't actually encrypt
-        return new Box(nonce, data, DataChannelNonce.TOTAL_LENGTH);
+        return new saltyrtcClient.Box(nonce, data, DataChannelNonce.TOTAL_LENGTH);
     };
 
     // noinspection JSMethodCanBeStatic
