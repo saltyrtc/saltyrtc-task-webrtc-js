@@ -8,7 +8,7 @@
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
 
 import {DataChannelCryptoContext} from "./crypto";
-import {SignalingTransport} from "./transport";
+import {SignalingTransport, SignalingTransportLink} from "./transport";
 
 /**
  * WebRTC Task Version 1.
@@ -34,9 +34,6 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private static FIELD_EXCLUDE = 'exclude';
     private static FIELD_HANDOVER = 'handover';
 
-    // Other constants
-    private static DC_LABEL = 'saltyrtc-signaling';
-
     // Logging
     private log: saltyrtc.Log;
     private logTag = '[SaltyRTC.WebRTC]';
@@ -52,8 +49,9 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private _signaling: saltyrtc.Signaling;
 
     // Signalling transport
-    private transportFactory: saltyrtc.tasks.webrtc.SignalingTransportFactory;
+    private doHandover: boolean;
     private readonly maxChunkLength: number;
+    private link: SignalingTransportLink | null = null;
     private transport: SignalingTransport | null = null;
 
     // Events
@@ -67,9 +65,8 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     /**
      * Create a new task instance.
      *
-     * @param handover Set this parameter to a `SignalingTransportHandler`
-     *   factory if you want to hand over the signalling channel to a data
-     *   channel. Defaults to *no handover*.
+     * @param handover Set this parameter to `false` if you want to disable the
+     *   handover of the signalling channel to a dedicated data channel.
      * @param logLevel The log level. Defaults to `none`.
      * @param maxChunkLength The maximum amount of bytes used for a chunk
      *   when fragmenting messages for a `SignalingTransportHandler`. Defaults
@@ -77,11 +74,11 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      *   `SignalingTransportHandler.maxMessageSize` as its upper limit.
      */
     constructor(
-        handover: saltyrtc.tasks.webrtc.SignalingTransportFactory = null,
+        handover: boolean = true,
         logLevel: saltyrtc.LogLevel = 'none',
         maxChunkLength: number = 262144,
     ) {
-        this.transportFactory = handover;
+        this.doHandover = handover;
         this.log = new saltyrtcClient.Log(logLevel);
         this.maxChunkLength = maxChunkLength;
     }
@@ -130,7 +127,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 break;
             }
         }
-        if (this.channelId === undefined && this.transportFactory !== null) {
+        if (this.channelId === undefined && this.doHandover) {
             const error = 'Exclude list is too restricting, no free data channel id can be found';
             throw new Error(error);
         }
@@ -141,7 +138,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      */
     private processHandover(handover: boolean): void {
         if (handover === false) {
-            this.transportFactory = null;
+            this.doHandover = false;
         }
     }
 
@@ -190,7 +187,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 this.emit({type: 'candidates', data: message['candidates']});
                 break;
             case 'handover':
-                if (this.transportFactory !== null) {
+                if (!this.doHandover) {
                     this.log.error(this.logTag, 'Received unexpected handover message from peer');
                     this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
@@ -290,7 +287,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
                 "Could not send signaling message: Signaling state is not 'task'.");
         }
-        if (this.signaling.handoverState.local === false) {
+        if (!this.signaling.handoverState.local) {
             throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
                 "Could not send signaling message: Handover hasn't happened yet.");
         }
@@ -330,7 +327,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     public getData(): Object {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
-        data[WebRTCTask.FIELD_HANDOVER] = this.transportFactory !== null;
+        data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
         return data;
     }
 
@@ -418,57 +415,86 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Initiate the handover from WebSocket to a WebRTC data channel.
+     * Create a `SignalingTransportLink` to be used by the application for the
+     * handover process.
      *
-     * Return a boolean indicating whether the handover has been initiated.
+     * If the application wishes to hand over the signalling channel, it MUST
+     * create an `RTCDataChannel` instance with the following properties:
      *
-     * This operation is asynchronous. To get notified when the handover is finished, subscribe to
-     * the SaltyRTC `handover` event.
+     * - `negotiated` must be `true`,
+     * - `ordered` must be `true`, and
+     * - further properties are `label`, `id` and `protocol` as passed to
+     *   the factory (attributes of `SignalingTransportLink`) which SHALL NOT
+     *   be modified by the application.
+     *
+     * Once the `RTCDataChannel` instance moves into the `open` state, the
+     * `SignalingTransportHandler` SHALL be created. The handover process
+     * MUST be initiated immediately (without yielding back to the event loop)
+     * once the `open` event fires to prevent messages from being lost.
+     *
+     * In case the `RTCDataChannel` instance moves into the `closed` state or
+     * errors before opening, the application SHALL NOT start the handover
+     * process.
+     *
+     * @return all necessary information to create a dedicated `RTCDataChannel`
+     * and contains functions for forwarding events and messages.
+     *
+     * @throws Error in case handover has not been negotiated or no free
+     *   channel id could be determined during negotiation.
      */
-    public handover(): boolean {
+    public getTransportLink(): saltyrtc.tasks.webrtc.SignalingTransportLink {
+        this.log.debug(this.logTag, 'Create signalling transport link');
+
+        // Make sure handover has been negotiated
+        if (!this.doHandover) {
+            throw new Error('Handover has not been negotiated');
+        }
+
+        // Make sure the data channel id is set
+        if (this.channelId === undefined) {
+            const error = 'Data channel id not set';
+            throw new Error(error);
+        }
+
+        // Return the transport link
+        if (this.link === null) {
+            this.link = new SignalingTransportLink(this.channelId, WebRTCTask.PROTOCOL_NAME);
+        }
+        return this.link;
+    }
+
+    /**
+     * Initiate the handover from WebSocket to a dedicated data channel.
+     *
+     * This operation is asynchronous. To get notified when the handover is
+     * finished, subscribe to the SaltyRTC `handover` event.
+     *
+     * @throws Error in case handover already requested or has not been
+     *   negotiated.
+     */
+    public handover(handler: saltyrtc.tasks.webrtc.SignalingTransportHandler): void {
         this.log.debug(this.logTag, 'Initiate handover');
 
-        // Make sure this is intended
-        if (this.transportFactory === null) {
-            this.log.error(
-                this.logTag, 'Cannot do handover: Either us or remote set handover=false');
-            return false;
+        // Make sure handover has been negotiated
+        if (!this.doHandover) {
+            throw new Error('Handover has not been negotiated');
         }
 
-        // Make sure handover hasn't already happened
-        if (this.signaling.handoverState.any) {
-            this.log.error(this.logTag, 'Handover already in progress or finished');
-            return false;
+        // Make sure handover has not already been requested
+        if (this.signaling.handoverState.local || this.transport !== null) {
+            throw new Error('Handover already requested');
         }
 
-        // Make sure the dc id is set
-        if (this.channelId === undefined || this.channelId === null) {
-            this.log.error(this.logTag, 'Data channel id not set');
-            this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
-            throw new Error('Data channel id not set');
-        }
+        // Create crypto context and new signalling transport
+        const crypto = this.createCryptoContext(this.channelId);
+        this.transport = new SignalingTransport(
+            this.link, handler, this, this.signaling, crypto, this.log.level, this.maxChunkLength);
 
-        // Create signalling (data) channel
-        this.transportFactory(WebRTCTask.DC_LABEL, this.channelId, WebRTCTask.PROTOCOL_NAME)
-            .then((dc: saltyrtc.tasks.webrtc.SignalingTransportHandler) => {
-                if (this.signaling.getState() === 'task') {
-                    // Create crypto context and transport
-                    const crypto = this.createCryptoContext(this.channelId);
-                    this.transport = new SignalingTransport(
-                        dc, this, this.signaling, crypto, this.log.level, this.maxChunkLength);
-
-                    // Send handover message
-                    this.sendHandover();
-                }
-            })
-            .catch((reason) => {
-                if (this.signaling.getState() === 'task') {
-                    this.log.error('Creating data channel failed, reason:', reason);
-                }
-            });
-
-        // Done
-        return true;
+        // Send handover message
+        // Note: This will still be sent via the original transport since the
+        //       switching logic depends on the local handover state which
+        //       SHALL NOT be altered before this call.
+        this.sendHandover();
     }
 
     /**
