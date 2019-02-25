@@ -9,7 +9,7 @@
 import {Box} from "@saltyrtc/client";
 import {DataChannelNonce} from "../src/nonce";
 import {DataChannelCryptoContext} from "../src/crypto";
-import {SignalingTransport} from "../src/transport";
+import {SignalingTransport, SignalingTransportLink} from "../src/transport";
 
 /**
  * Fakes the signalling and simulates a state where the task has kicked in and
@@ -21,6 +21,7 @@ class FakeSignaling {
     public state: saltyrtc.SignalingState = 'task';
     public messages: Array<Uint8Array> = [];
 
+    // noinspection JSMethodCanBeStatic
     public get handoverState(): saltyrtc.HandoverState {
         return {
             any: true,
@@ -35,11 +36,13 @@ class FakeSignaling {
         this.messages.push(message);
     }
 
+    // noinspection JSMethodCanBeStatic
     public encryptForPeer(data: Uint8Array, nonce: Uint8Array): saltyrtc.Box {
         // Don't actually encrypt
         return new Box(nonce, data, DataChannelNonce.TOTAL_LENGTH);
     };
 
+    // noinspection JSMethodCanBeStatic
     public decryptFromPeer(box: saltyrtc.Box): Uint8Array {
         // Don't actually decrypt
         return box.data;
@@ -57,6 +60,8 @@ class FakeTask {
 }
 
 export default () => {
+    const ID = 1337;
+
     describe('transport', function() {
         describe('SignalingTransport', function() {
             // Defines a maximum payload size of 2 bytes per chunk
@@ -77,27 +82,29 @@ export default () => {
                 this.fakeSignaling = new FakeSignaling() as saltyrtc.Signaling;
                 // @ts-ignore
                 this.fakeTask = new FakeTask() as saltyrtc.tasks.webrtc.WebRTCTask;
-                this.context = new DataChannelCryptoContext(1337, this.fakeSignaling);
+                this.context = new DataChannelCryptoContext(ID, this.fakeSignaling);
             });
 
             const createTransport = (
                 handler: saltyrtc.tasks.webrtc.SignalingTransportHandler
-            ): SignalingTransport => {
+            ): [SignalingTransportLink, SignalingTransport] => {
+                const link = new SignalingTransportLink(ID, 'fake-protocol');
                 const transport = new SignalingTransport(
-                    handler, this.fakeTask, this.fakeSignaling, this.context, 'debug', 20);
+                    link, handler, this.fakeTask, this.fakeSignaling, this.context, 'debug', 20);
                 this.fakeTask.transport = transport;
-                return transport;
+                return [link, transport];
             };
 
             it('binds and forwards closing', () => {
                 const handler = {} as saltyrtc.tasks.webrtc.SignalingTransportHandler;
-                createTransport(handler);
+                // noinspection JSUnusedLocalSymbols
+                const [link, _] = createTransport(handler);
 
                 // Before closed
                 expect(this.fakeSignaling.state).toBe('task');
 
                 // Close
-                handler.onclose();
+                link.closed();
                 expect(this.fakeSignaling.state).toBe('closed');
             });
 
@@ -108,7 +115,8 @@ export default () => {
                     maxMessageSize: MAX_MESSAGE_SIZE,
                     send: (chunk: Uint8Array) => actualChunks.push(chunk.slice()),
                 } as saltyrtc.tasks.webrtc.SignalingTransportHandler;
-                const transport = createTransport(handler);
+                // noinspection JSUnusedLocalSymbols
+                const [_, transport] = createTransport(handler);
 
                 // Send message
                 transport.send(MESSAGE);
@@ -121,7 +129,8 @@ export default () => {
                 const handler = {
                     maxMessageSize: MAX_MESSAGE_SIZE,
                 } as saltyrtc.tasks.webrtc.SignalingTransportHandler;
-                createTransport(handler);
+                // noinspection JSUnusedLocalSymbols
+                const [link, _] = createTransport(handler);
 
                 // Before nonce and chunks
                 expect(this.fakeSignaling.messages.length).toBe(0);
@@ -129,25 +138,25 @@ export default () => {
                 // Add fake nonce
                 for (let i = 0; i < 8; ++i) {
                     // Cookie
-                    handler.onmessage(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, i, 255, 255));
+                    link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, i, 255, 255));
                 }
                 // Data channel id: 1337
-                handler.onmessage(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 8, 5, 57));
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 8, 5, 57));
                 // Overflow number: 0
-                handler.onmessage(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0));
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0));
                 // Sequence number: 42
-                handler.onmessage(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0));
-                handler.onmessage(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 42));
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0));
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 42));
 
                 // Add first two chunks
                 expect(this.fakeSignaling.messages.length).toBe(0);
-                handler.onmessage(CHUNKS[0]);
+                link.receive(CHUNKS[0]);
                 expect(this.fakeSignaling.messages.length).toBe(0);
-                handler.onmessage(CHUNKS[1]);
+                link.receive(CHUNKS[1]);
                 expect(this.fakeSignaling.messages.length).toBe(0);
 
                 // Add last chunk
-                handler.onmessage(CHUNKS[2]);
+                link.receive(CHUNKS[2]);
                 expect(this.fakeSignaling.messages.length).toBe(1);
                 expect(this.fakeSignaling.messages[0]).toEqual(MESSAGE);
             });
@@ -159,16 +168,18 @@ export default () => {
                     send: () => { throw new Error('nope') },
                     close: () => { throw new Error('still nope') },
                 } as saltyrtc.tasks.webrtc.SignalingTransportHandler;
-                const transport = createTransport(handler);
-
-                // Ensure binds
-                expect(handler.onclose).toBeDefined();
-                expect(handler.onmessage).toBeDefined();
+                const [link, transport] = createTransport(handler);
 
                 // Trigger failure while sending
                 transport.send(MESSAGE);
-                expect(handler.onclose).toBeUndefined();
-                expect(handler.onmessage).toBeUndefined();
+
+                // Ensure untied
+                expect(() => link.closed()).toThrowError(
+                    'closed: Not tied to a SignalingTransport');
+                expect(() => link.receive(new Uint8Array(0))).toThrowError(
+                    'receive: Not tied to a SignalingTransport');
+
+                // Ensure closed
                 expect(this.fakeTask.closed).toBeTruthy();
             });
         });
