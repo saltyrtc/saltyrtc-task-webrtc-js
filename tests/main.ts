@@ -20,4 +20,4 @@ beforeEach(() => console.info('------ TEST', counter++, 'BEGIN ------'));
 test_nonce();
 test_crypto();
 test_transport();
-//test_integration();
+test_integration();
