@@ -18,14 +18,11 @@ import {SignalingTransport, SignalingTransportLink} from "../src/transport";
  */
 class FakeSignaling {
     public state: saltyrtc.SignalingState = 'task';
+    public handoverState: saltyrtc.HandoverState = {
+        any: true,
+        peer: true,
+    } as saltyrtc.HandoverState;
     public messages: Array<Uint8Array> = [];
-
-    // noinspection JSMethodCanBeStatic
-    public get handoverState(): saltyrtc.HandoverState {
-        return {
-            any: true,
-        } as saltyrtc.HandoverState;
-    }
 
     public setState(state: saltyrtc.SignalingState): void {
         this.state = state;
@@ -180,6 +177,52 @@ export default () => {
 
                 // Ensure closed
                 expect(this.fakeTask.closed).toBeTruthy();
+            });
+
+            it('queues messages until handover requested by remote', () => {
+                const handler = {
+                    maxMessageSize: MAX_MESSAGE_SIZE,
+                } as saltyrtc.tasks.webrtc.SignalingTransportHandler;
+                this.fakeSignaling.handoverState.peer = false;
+                // noinspection JSUnusedLocalSymbols
+                const [link, transport] = createTransport(handler);
+
+                // Before nonce and chunks
+                expect(this.fakeSignaling.messages.length).toBe(0);
+
+                // Add fake nonce
+                for (let i = 0; i < 8; ++i) {
+                    // Cookie
+                    link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, i, 255, 255));
+                }
+                // Data channel id: 1337
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 8, 5, 57));
+                // Overflow number: 0
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0));
+                // Sequence number: 42
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0));
+                link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 42));
+                // Add all chunks
+                for (const chunk of CHUNKS) {
+                    link.receive(chunk);
+                }
+
+                // Expect messages to be queued
+                expect(this.fakeSignaling.messages.length).toBe(0);
+                // @ts-ignore
+                expect(transport.messageQueue[0]).toEqual(MESSAGE);
+
+                // Flush queue
+                expect(() => transport.flushMessageQueue()).toThrowError(
+                    'Remote did not request handover');
+                this.fakeSignaling.handoverState.peer = true;
+                transport.flushMessageQueue();
+
+                // Expect messages to be processed now
+                // @ts-ignore
+                expect(transport.messageQueue).toBe(null);
+                expect(this.fakeSignaling.messages.length).toBe(1);
+                expect(this.fakeSignaling.messages[0]).toEqual(MESSAGE);
             });
         });
     });
