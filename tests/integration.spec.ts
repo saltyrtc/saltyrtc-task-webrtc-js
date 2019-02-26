@@ -448,6 +448,32 @@ export default () => {
                 pair.initiator.task.sendCandidate(candidates[1]);
             });
 
+            it('ensure handover message not sent on data channel', async () => {
+                const pair = this.pair as PeerContextPair;
+                await setupPeerConnection(pair, false);
+
+                // Wait until all ICE candidates have been exchanged
+                await Promise.all([
+                    allIceCandidatesReceived(pair.initiator),
+                    allIceCandidatesReceived(pair.responder),
+                ]);
+
+                // Ensure no messages are being transferred after the dust settled
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                const messageHandler = (event: MessageEvent) => {
+                    console.error('Unexpected message:', event.data);
+                    fail('Unexpected message');
+                };
+
+                // Start handover process
+                await Promise.all([
+                    handoverToDataChannel(pair.initiator, messageHandler),
+                    handoverToDataChannel(pair.responder, messageHandler),
+                ]);
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                expect(0).toBe(0);
+            });
+
             it('can communicate on handover data channel', async () => {
                 const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
