@@ -63,6 +63,55 @@ To know when the handover is finished, please subscribe to the `handover` event 
 
 ## Testing
 
+### 1. Preparing the Server
+
+First, clone the `saltyrtc-server-python` repository.
+
+    git clone https://github.com/saltyrtc/saltyrtc-server-python
+    cd saltyrtc-server-python
+
+Then create a test certificate for localhost, valid for 5 years.
+
+    openssl req \
+       -newkey rsa:1024 \
+       -x509 \
+       -nodes \
+       -keyout saltyrtc.key \
+       -new \
+       -out saltyrtc.crt \
+       -subj /CN=localhost \
+       -reqexts SAN \
+       -extensions SAN \
+       -config <(cat /etc/ssl/openssl.cnf \
+         <(printf '[SAN]\nsubjectAltName=DNS:localhost')) \
+       -sha256 \
+       -days 1825
+
+You can import this file into your browser certificate store. For Chrome/Chromium, use this command:
+
+    certutil -d sql:$HOME/.pki/nssdb -A -t "P,," -n saltyrtc-test-ca -i saltyrtc.crt
+
+In Firefox the easiest way to add your certificate to the browser is to start
+the SaltyRTC server (e.g. on `localhost` port 8765), then to visit the
+corresponding URL via https (e.g. `https://localhost:8765`). Then, in the
+certificate warning dialog that pops up, choose "Advanced" and add a permanent
+exception.
+
+Create a Python virtualenv with dependencies:
+
+    python3 -m virtualenv venv
+    venv/bin/pip install .[logging]
+
+Finally, start the server with the following test permanent key:
+
+    export SALTYRTC_SERVER_PERMANENT_KEY=0919b266ce1855419e4066fc076b39855e728768e3afa773105edd2e37037c20 # Public: 09a59a5fa6b45cb07638a3a6e347ce563a948b756fd22f9527465f7c79c2a864
+    venv/bin/saltyrtc-server -v 5 serve -p 8765 \
+        -sc saltyrtc.crt -sk saltyrtc.key \
+        -k $SALTYRTC_SERVER_PERMANENT_KEY
+
+
+### 2. Running Tests
+
 To compile the test sources, run:
 
     $ npm run rollup_tests
