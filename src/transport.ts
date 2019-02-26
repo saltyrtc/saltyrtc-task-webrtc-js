@@ -88,6 +88,9 @@ export class SignalingTransport {
     private readonly unchunker: chunkedDc.Unchunker;
     private messageId: number = 0;
 
+    // Incoming message queue
+    private messageQueue: Array<Uint8Array> | null;
+
     /**
      * Create a new signaling transport.
      *
@@ -118,6 +121,9 @@ export class SignalingTransport {
         this.chunkLength = Math.min(this.handler.maxMessageSize, maxChunkLength);
         this.chunkBuffer = new ArrayBuffer(this.chunkLength);
 
+        // Initialise message queue
+        this.messageQueue = this.signaling.handoverState.peer ? null : [];
+
         // Create unchunker and bind events
         // Note: The unreliable/unordered unchunker must be used for backwards compatibility since
         //       the WebRTC task v1 has been specified with the v1.0 chunking specification.
@@ -130,7 +136,7 @@ export class SignalingTransport {
         this.link.tie(this);
 
         // Done
-        this.log.info(this.logTag, 'Signaling transport established');
+        this.log.info(this.logTag, 'Signaling transport created');
     }
 
     /**
@@ -179,8 +185,40 @@ export class SignalingTransport {
             return this.die();
         }
 
+        // Queue message until the transport has been acknowledged by the
+        // remote peer with a handover request.
+        //
+        // Note: This mechanism is required to prevent reordering of messages.
+        if (!this.signaling.handoverState.peer) {
+            this.messageQueue.push(message);
+            return;
+        }
+
         // Process message
         this.signaling.onSignalingPeerMessage(message);
+    }
+
+    /**
+     * Flush the queue of pending messages.
+     *
+     * This should be called once the remote peer has acknowledged the
+     * transport with a handover request (i.e. a 'handover' message).
+     *
+     * @throws Error in case the remote peer has not requested a handover.
+     */
+    public flushMessageQueue(): void {
+        // Ensure handover has been requested
+        if (!this.signaling.handoverState.peer) {
+            throw new Error('Remote did not request handover');
+        }
+
+        // Flush
+        for (const message of this.messageQueue) {
+            this.signaling.onSignalingPeerMessage(message);
+        }
+
+        // Remove queue
+        this.messageQueue = null;
     }
 
     /**

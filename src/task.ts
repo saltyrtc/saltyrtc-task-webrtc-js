@@ -187,15 +187,31 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 this.emit({type: 'candidates', data: message['candidates']});
                 break;
             case 'handover':
+                // Ensure handover has been negotiated
                 if (!this.doHandover) {
                     this.log.error(this.logTag, 'Received unexpected handover message from peer');
                     this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
                 }
-                if (this.signaling.handoverState.local === false) {
-                    this.sendHandover();
+
+                // Discard repeated handover requests
+                if (this.signaling.handoverState.peer) {
+                    // Note: This is not being treated as a protocol error since previous
+                    //       versions had a race condition that could trigger multiple
+                    //       sends of 'handover'.
+                    this.log.warn(this.logTag, 'Handover already received');
+                    break;
                 }
+
+                // Update state
                 this.signaling.handoverState.peer = true;
+
+                // Flush the message queue of the signaling transport (if any)
+                if (this.transport !== null) {
+                    this.transport.flushMessageQueue();
+                }
+
+                // Handover process completed?
                 if (this.signaling.handoverState.both) {
                     this.log.info(this.logTag, 'Handover to data channel finished');
                 }
