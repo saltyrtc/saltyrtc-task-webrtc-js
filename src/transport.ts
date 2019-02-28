@@ -8,6 +8,8 @@
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
 /// <reference types="@saltyrtc/chunked-dc" />
 
+import {DataChannelCryptoContext} from "./crypto";
+
 /**
  * Contains all necessary information needed to create a dedicated data channel
  * for the purpose of exchanging signalling data and to forward messages and
@@ -177,7 +179,8 @@ export class SignalingTransport {
         this.log.debug(this.logTag, 'Received message');
 
         // Decrypt message
-        const box = saltyrtcClient.Box.fromUint8Array(message, this.crypto.NONCE_LENGTH);
+        const box = saltyrtcClient.Box.fromUint8Array(
+            message, DataChannelCryptoContext.NONCE_LENGTH);
         try {
             message = this.crypto.decrypt(box)
         } catch (error) {

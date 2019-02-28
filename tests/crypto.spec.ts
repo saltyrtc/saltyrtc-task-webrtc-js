@@ -10,6 +10,7 @@
 import {DataChannelCryptoContext} from "../src/crypto";
 import {DataChannelNonce} from "../src/nonce";
 
+const OVERHEAD_LENGTH = 40;
 const NONCE_LENGTH = 24;
 
 class FakeSignaling {
@@ -29,11 +30,9 @@ export default () => {
         describe('DataChannelCryptoContext', function() {
             const CHANNEL_ID = 1337;
 
-            it('returns correct nonce length', () => {
-                // @ts-ignore
-                const fakeSignaling = new FakeSignaling() as saltyrtc.Signaling;
-                const context = new DataChannelCryptoContext(CHANNEL_ID, fakeSignaling);
-                expect(context.NONCE_LENGTH).toEqual(NONCE_LENGTH);
+            it('returns correct overhead and nonce length', () => {
+                expect(DataChannelCryptoContext.OVERHEAD_LENGTH).toBe(OVERHEAD_LENGTH);
+                expect(DataChannelCryptoContext.NONCE_LENGTH).toBe(NONCE_LENGTH);
             });
 
             describe('encrypt', function() {
