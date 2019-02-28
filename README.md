@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/saltyrtc/saltyrtc-task-webrtc-js)
 [![Chat on Gitter](https://badges.gitter.im/saltyrtc/Lobby.svg)](https://gitter.im/saltyrtc/Lobby)
 
-This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task version 1 implementation for
-JavaScript (ES5 / ES2015), written in TypeScript.
+This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task version 1
+implementation for JavaScript (ES5 / ES2015), written in TypeScript.
 
 **Warning: This is beta software. Use at your own risk. Testing and review is
 welcome!**
@@ -19,47 +19,131 @@ welcome!**
 
 You can install this library via `npm`:
 
-    npm install --save @saltyrtc/task-webrtc @saltyrtc/client
+```bash
+npm install --save @saltyrtc/task-webrtc @saltyrtc/client
+```
 
 ## Usage
 
-When creating the task instance, you can specify whether or not a handover to a dedicated data channel is desired.
-In case you want to apply a handover, you must implement the `SignalingTransportHandler` interface and provide a
-factory function to create an instance of it. 
+When creating the task instance, you can specify whether or not a handover to a
+dedicated data channel is desired. 
 
-    let task = new WebRTCTask(signalingTransportHandlerFactory);
+```js
+const task = new WebRTCTask(true);
+```
 
-If you don't specify any values, no handover will be requested.
-
-The handover can be initiated using the handover method:
-
-    let started = task.handover(peerConnection);
-
-*Note: You should call this method before creating offer/answer!*
+If you don't specify any values, `handover` defaults to `true`, `logLevel`
+defaults to `info` and `maxChunkLength` used for the signalling transport
+defaults to 256 KiB.
 
 To send offers, answers and candidates, use the following task methods:
 
-* `.sendOffer(offer: RTCSessionDescriptionInit): void`
-* `.sendAnswer(answer: RTCSessionDescriptionInit): void`
-* `.sendCandidate(candidate: RTCIceCandidateInit): void`
-* `.sendCandidates(candidates: RTCIceCandidateInit[]): void`
+* `task.sendOffer(offer: RTCSessionDescriptionInit): void`
+* `task.sendAnswer(answer: RTCSessionDescriptionInit): void`
+* `task.sendCandidate(candidate: RTCIceCandidateInit): void`
+* `task.sendCandidates(candidates: RTCIceCandidateInit[]): void`
 
-You can register and deregister event handlers with the `on`, `once` and `off` methods:
+You can register and deregister event handlers with the `on`, `once` and `off`
+methods:
 
-    task.on('candidates', (e) => {
-        for (let candidateInit of e.data) {
-            pc.addIceCandidate(candidateInit);
-        }
-    });
+```js
+task.on('candidates', (e) => {
+    for (let candidateInit of e.data) {
+        pc.addIceCandidate(candidateInit);
+    }
+});
+````
 
 The following events are available:
 
 * `offer(saltyrtc.tasks.webrtc.Offer)`: An offer message was received.
 * `answer(saltyrtc.tasks.webrtc.Answer)`: An answer message was received.
-* `candidates(saltyrtc.tasks.webrtc.Candidates)`: A candidates message was received.
-* `disconnected(number)`: A previously authenticated peer disconnected from the signaling server.
+* `candidates(saltyrtc.tasks.webrtc.Candidates)`: A candidates message was
+  received.
+* `disconnected(number)`: A previously authenticated peer disconnected from the
+  signaling server.
 
-To know when the handover is finished, please subscribe to the `handover` event on the client directly.
+### Data Channel Crypto Context
+
+The task provides another security layer for data channels which can be
+leveraged by usage of a `DataChannelCryptoContext` instance. To retrieve such
+an instance, call:
+
+```js
+const context = task.createCryptoContext(dataChannel.id);
+```
+
+You can encrypt messages on the sending end in the following way:
+
+```js
+const box = context.encrypt(yourData);
+dataChannel.send(box.toUint8Array());
+```
+
+On the receiving end, decrypt the message by the use of the crypto context:
+
+```js
+const box = saltyrtcClient.Box.fromUint8Array(message, DataChannelCryptoContext.NONCE_LENGTH);
+const yourData = context.decrypt(box);
+```
+
+Note, that you should not use a crypto context for a data channel that is being
+used for handover. The task will take care of encryption and decryption itself.
+
+### Handover
+
+Before initiating the handover, the application needs to fetch the
+`SignalingTransportLink` instance which contains the necessary information to
+create a data channel.
+
+```js
+const link = task.getTransportLink();
+
+const dataChannel = peerConnection.createDataChannel(link.label, {
+    id: link.id,
+    negotiated: true,
+    ordered: true,
+    protocol: link.protocol,
+});
+```
+
+Note that the data channel used for handover **must** be created with the
+label and parameters as shown in the above code snippet.
+
+Now that you have created the channel, you need to implement the
+`SignalingTransportHandler` interface. Below is a minimal handler that forwards
+the necessary events and messages to the created data channel.
+
+```js
+const handler = {
+    get maxMessageSize() {
+        return peerConnection.sctp.maxMessageSize;
+    },
+    close() {
+        dataChannel.close();
+    },
+    send(message) {
+        dataChannel.send(message);
+    },
+}
+```
+
+Furthermore, you have to bind all necessary events in order to connect the data
+channel to the `SignalingTransportLink`.
+
+```js
+dataChannel.onopen = () => task.handover(handler);
+dataChannel.onclose = () => link.closed();
+dataChannel.binaryType = 'arraybuffer';
+dataChannel.onmessage = (event) => link.receive(new Uint8Array(event.data));
+```
+
+The above setup will forward the `close` event and all messages to the task by
+the use of the `SignalingTransportLink`. On `open`, the handover will be
+initiated.
+
+To be signalled once the handover is finished, you need to subscribe to the
+`handover` event on the SaltyRTC client instance.
 
 ## Testing
 
@@ -67,29 +151,35 @@ To know when the handover is finished, please subscribe to the `handover` event 
 
 First, clone the `saltyrtc-server-python` repository.
 
-    git clone https://github.com/saltyrtc/saltyrtc-server-python
-    cd saltyrtc-server-python
+```bash
+git clone https://github.com/saltyrtc/saltyrtc-server-python
+cd saltyrtc-server-python
+```
 
 Then create a test certificate for localhost, valid for 5 years.
 
-    openssl req \
-       -newkey rsa:1024 \
-       -x509 \
-       -nodes \
-       -keyout saltyrtc.key \
-       -new \
-       -out saltyrtc.crt \
-       -subj /CN=localhost \
-       -reqexts SAN \
-       -extensions SAN \
-       -config <(cat /etc/ssl/openssl.cnf \
-         <(printf '[SAN]\nsubjectAltName=DNS:localhost')) \
-       -sha256 \
-       -days 1825
+```bash
+openssl req \
+   -newkey rsa:1024 \
+   -x509 \
+   -nodes \
+   -keyout saltyrtc.key \
+   -new \
+   -out saltyrtc.crt \
+   -subj /CN=localhost \
+   -reqexts SAN \
+   -extensions SAN \
+   -config <(cat /etc/ssl/openssl.cnf \
+     <(printf '[SAN]\nsubjectAltName=DNS:localhost')) \
+   -sha256 \
+   -days 1825
+```
 
 You can import this file into your browser certificate store. For Chrome/Chromium, use this command:
 
-    certutil -d sql:$HOME/.pki/nssdb -A -t "P,," -n saltyrtc-test-ca -i saltyrtc.crt
+```bash
+certutil -d sql:$HOME/.pki/nssdb -A -t "P,," -n saltyrtc-test-ca -i saltyrtc.crt
+```
 
 In Firefox the easiest way to add your certificate to the browser is to start
 the SaltyRTC server (e.g. on `localhost` port 8765), then to visit the
@@ -99,28 +189,35 @@ exception.
 
 Create a Python virtualenv with dependencies:
 
-    python3 -m virtualenv venv
-    venv/bin/pip install .[logging]
+```bash
+python3 -m virtualenv venv
+venv/bin/pip install .[logging]
+```
 
 Finally, start the server with the following test permanent key:
 
-    export SALTYRTC_SERVER_PERMANENT_KEY=0919b266ce1855419e4066fc076b39855e728768e3afa773105edd2e37037c20 # Public: 09a59a5fa6b45cb07638a3a6e347ce563a948b756fd22f9527465f7c79c2a864
-    venv/bin/saltyrtc-server -v 5 serve -p 8765 \
-        -sc saltyrtc.crt -sk saltyrtc.key \
-        -k $SALTYRTC_SERVER_PERMANENT_KEY
-
+```bash
+export SALTYRTC_SERVER_PERMANENT_KEY=0919b266ce1855419e4066fc076b39855e728768e3afa773105edd2e37037c20 # Public: 09a59a5fa6b45cb07638a3a6e347ce563a948b756fd22f9527465f7c79c2a864
+venv/bin/saltyrtc-server -v 5 serve -p 8765 \
+    -sc saltyrtc.crt -sk saltyrtc.key \
+    -k $SALTYRTC_SERVER_PERMANENT_KEY
+```
 
 ### 2. Running Tests
 
 To compile the test sources, run:
 
-    $ npm run rollup_tests
+```bash
+npm run rollup_tests
+```
 
 Then simply open `tests/testsuite.html` in your browser!
 
 Alternatively, run the tests automatically in Firefox and Chrome:
 
-    $ npm test
+```bash
+npm test
+```
 
 ## Security
 
