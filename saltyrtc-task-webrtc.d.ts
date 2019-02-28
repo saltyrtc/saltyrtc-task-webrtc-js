@@ -18,8 +18,6 @@ declare namespace saltyrtc.tasks.webrtc {
      * specific id.
      */
     interface DataChannelCryptoContext {
-        readonly NONCE_LENGTH: number;
-
         /**
          * Encrypt data to be sent on the channel.
          *
@@ -35,6 +33,18 @@ declare namespace saltyrtc.tasks.webrtc {
          * @throws ValidationError in case the nonce is invalid.
          */
         decrypt(box: saltyrtc.Box): Uint8Array;
+    }
+
+    interface DataChannelCryptoContextStatic {
+        /**
+         * Amount of bytes added to a message being encrypted.
+         */
+        readonly OVERHEAD_LENGTH: number;
+
+        /**
+         * Amount of bytes used for the nonce.
+         */
+        readonly NONCE_LENGTH: number;
     }
 
     /**
@@ -145,4 +155,5 @@ declare namespace saltyrtc.tasks.webrtc {
 
 declare var saltyrtcTaskWebrtc: {
     WebRTCTask: saltyrtc.tasks.webrtc.WebRTCTaskStatic,
+    DataChannelCryptoContext: saltyrtc.tasks.webrtc.DataChannelCryptoContextStatic,
 };

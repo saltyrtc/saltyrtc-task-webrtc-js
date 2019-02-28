@@ -19,6 +19,9 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
     private readonly csnPair: saltyrtc.CombinedSequencePair;
     private lastIncomingCsn: number = null;
 
+    public static OVERHEAD_LENGTH: number = 40;
+    public static NONCE_LENGTH: number = DataChannelNonce.TOTAL_LENGTH;
+
     constructor(channelId: number, signaling: saltyrtc.Signaling) {
         this.channelId = channelId;
         this.signaling = signaling;
@@ -26,16 +29,12 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
         this.csnPair = new saltyrtcClient.CombinedSequencePair();
     }
 
-    public get NONCE_LENGTH(): number {
-        return DataChannelNonce.TOTAL_LENGTH;
-    }
-
     /**
      * Encrypt data to be sent on the channel.
      *
      * @param data The bytes to be encrypted.
      */
-    encrypt(data: Uint8Array): saltyrtc.Box {
+    public encrypt(data: Uint8Array): saltyrtc.Box {
         // Get next outgoing CSN
         const csn: saltyrtc.NextCombinedSequence = this.csnPair.ours.next();
 
@@ -54,7 +53,7 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
      *
      * @throws ValidationError in case the nonce is invalid.
      */
-    decrypt(box: saltyrtc.Box): Uint8Array {
+    public decrypt(box: saltyrtc.Box): Uint8Array {
         // Validate nonce
         let nonce: DataChannelNonce;
         try {
