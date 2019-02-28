@@ -7,7 +7,6 @@
 
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
 
-import {ValidationError} from "./exception";
 import {DataChannelNonce} from "./nonce";
 
 /**
@@ -61,12 +60,14 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
         try {
             nonce = DataChannelNonce.fromUint8Array(box.nonce);
         } catch (error) {
-            throw new ValidationError(`Unable to create nonce, reason: ${error}`);
+            throw new saltyrtcClient.exceptions.ValidationError(
+                `Unable to create nonce, reason: ${error}`);
         }
 
         // Make sure cookies are not the same
         if (nonce.cookie.equals(this.cookiePair.ours)) {
-            throw new ValidationError('Local and remote cookie are equal');
+            throw new saltyrtcClient.exceptions.ValidationError(
+                'Local and remote cookie are equal');
         }
 
         // If this is the first decrypt attempt, store peer cookie
@@ -76,7 +77,7 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
 
         // Otherwise make sure the peer cookie didn't change
         else if (!nonce.cookie.equals(this.cookiePair.theirs)) {
-            throw new ValidationError('Remote cookie changed');
+            throw new saltyrtcClient.exceptions.ValidationError('Remote cookie changed');
         }
 
         // Make sure that two consecutive incoming messages do not have the
@@ -86,13 +87,13 @@ export class DataChannelCryptoContext implements saltyrtc.tasks.webrtc.DataChann
         //       channels do not break.
         if (this.lastIncomingCsn !== null &&
             nonce.combinedSequenceNumber === this.lastIncomingCsn) {
-            throw new ValidationError('CSN reuse detected');
+            throw new saltyrtcClient.exceptions.ValidationError('CSN reuse detected');
         }
 
         // Validate data channel id
         if (nonce.channelId !== this.channelId) {
             const error = 'Data channel id in nonce does not match';
-            throw new ValidationError(error);
+            throw new saltyrtcClient.exceptions.ValidationError(error);
         }
 
         // Update incoming CSN
