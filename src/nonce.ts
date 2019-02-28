@@ -7,8 +7,6 @@
 
 /// <reference types="@saltyrtc/client" />
 
-import {ValidationError} from "./exception";
-
 /**
  * A SaltyRTC data channel nonce.
  *
@@ -52,7 +50,7 @@ export class DataChannelNonce {
      */
     public static fromUint8Array(data: Uint8Array): DataChannelNonce {
         if (data.byteLength !== this.TOTAL_LENGTH) {
-            throw new ValidationError('bad-packet-length');
+            throw new saltyrtcClient.exceptions.ValidationError('Bad packet length');
         }
 
         // Get view to buffer
