@@ -139,7 +139,7 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     interface WebRTCTaskStatic {
-        new(handover?: boolean, logLevel?: saltyrtc.LogLevel): WebRTCTask;
+        new(handover?: boolean, logLevel?: saltyrtc.LogLevel, maxChunkLength?: number): WebRTCTask;
     }
 
     interface OfferEvent extends saltyrtc.SaltyRTCEvent {
