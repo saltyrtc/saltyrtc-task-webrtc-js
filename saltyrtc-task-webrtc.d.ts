@@ -123,6 +123,16 @@ declare namespace saltyrtc.tasks.webrtc {
         receive(message: Uint8Array): void;
     }
 
+    type WebRTCTaskVersion = 'v1';
+
+    interface WebRTCTaskBuilder {
+        withLoggingLevel(level: saltyrtc.LogLevel): WebRTCTaskBuilder;
+        withVersion(version: WebRTCTaskVersion): WebRTCTaskBuilder;
+        withHandover(on: boolean): WebRTCTaskBuilder;
+        withMaxChunkLength(length: number): WebRTCTaskBuilder;
+        build(): WebRTCTask;
+    }
+
     interface WebRTCTask extends saltyrtc.Task {
         sendOffer(offer: RTCSessionDescriptionInit): void;
         sendAnswer(answer: RTCSessionDescriptionInit): void;
@@ -138,8 +148,8 @@ declare namespace saltyrtc.tasks.webrtc {
         off(event?: string | string[], handler?: saltyrtc.SaltyRTCEventHandler): void;
     }
 
-    interface WebRTCTaskStatic {
-        new(handover?: boolean, logLevel?: saltyrtc.LogLevel, maxChunkLength?: number): WebRTCTask;
+    interface WebRTCTaskBuilderStatic {
+        new(): WebRTCTaskBuilder;
     }
 
     interface OfferEvent extends saltyrtc.SaltyRTCEvent {
@@ -154,6 +164,6 @@ declare namespace saltyrtc.tasks.webrtc {
 }
 
 declare var saltyrtcTaskWebrtc: {
-    WebRTCTask: saltyrtc.tasks.webrtc.WebRTCTaskStatic,
+    WebRTCTaskBuilder: saltyrtc.tasks.webrtc.WebRTCTaskBuilderStatic,
     DataChannelCryptoContext: saltyrtc.tasks.webrtc.DataChannelCryptoContextStatic,
 };

@@ -11,6 +11,80 @@ import {DataChannelCryptoContext} from "./crypto";
 import {SignalingTransport, SignalingTransportLink} from "./transport";
 
 /**
+ * Builds a WebRTCTask instance.
+ *
+ * The following default values are being used:
+ *
+ * - Version defaults to `v1`.
+ * - The log level defaults to `none`.
+ * - Handover is enabled by default.
+ * - The maximum chunk length for the handed over signalling channel is
+ *   256 KiB.
+ */
+export class WebRTCTaskBuilder implements saltyrtc.tasks.webrtc.WebRTCTaskBuilder {
+    private version: saltyrtc.tasks.webrtc.WebRTCTaskVersion = 'v1';
+    private logLevel: saltyrtc.LogLevel = 'none';
+    private handover: boolean = true;
+    private maxChunkLength: number = 262144;
+
+    /**
+     * Set the logging level.
+     *
+     * @param level The desired logging level.
+     */
+    public withLoggingLevel(level: saltyrtc.LogLevel): WebRTCTaskBuilder {
+        this.logLevel = level;
+        return this;
+    }
+
+    /**
+     * Set the task version.
+     *
+     * @param version The desired task version.
+     */
+    public withVersion(version: saltyrtc.tasks.webrtc.WebRTCTaskVersion): WebRTCTaskBuilder {
+        this.version = version;
+        return this;
+    }
+
+    /**
+     * Set whether handover should be negotiated.
+     *
+     * @param on Enable or disable handover.
+     */
+    public withHandover(on: boolean): WebRTCTaskBuilder {
+        this.handover = on;
+        return this;
+    }
+
+    /**
+     * Set the maximum chunk length in bytes for the handed over
+     * signalling channel.
+     *
+     * @param length The maximum byte length of a chunk.
+     *
+     * @throws Error in case the maximum chunk length is less or equal
+     *   to the chunking header.
+     */
+    public withMaxChunkLength(length: number): WebRTCTaskBuilder {
+        if (length <= chunkedDc.UNRELIABLE_UNORDERED_HEADER_LENGTH) {
+            throw new Error('Maximum chunk length must be greater than chunking overhead');
+        }
+        this.maxChunkLength = length;
+        return this;
+    }
+
+    /**
+     * Build the WebRTCTask instance.
+     * @returns WebRTCTask
+     */
+    public build(): WebRTCTask {
+        return new WebRTCTask(
+            this.version, this.logLevel, this.handover, this.maxChunkLength);
+    }
+}
+
+/**
  * WebRTC Task Version 1.
  *
  * This task uses the end-to-end encryption techniques of SaltyRTC to set up a
@@ -27,22 +101,22 @@ import {SignalingTransport, SignalingTransportLink} from "./transport";
  * this task.
  */
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
-    // Constants as defined by the specification
-    private static PROTOCOL_NAME = 'v1.webrtc.tasks.saltyrtc.org';
-
     // Data fields
     private static FIELD_EXCLUDE = 'exclude';
     private static FIELD_HANDOVER = 'handover';
 
+    // Protocol version
+    private readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
+
     // Logging
-    private log: saltyrtc.Log;
+    private readonly log: saltyrtc.Log;
     private logTag = '[SaltyRTC.WebRTC]';
 
     // Initialization state
     private initialized = false;
 
     // Channel ID and ID exclusion list
-    private exclude: Set<number> = new Set();
+    private readonly exclude: Set<number> = new Set();
     private channelId: number;
 
     // Signaling
@@ -64,22 +138,14 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     /**
      * Create a new task instance.
-     *
-     * @param handover Set this parameter to `false` if you want to disable the
-     *   handover of the signalling channel to a dedicated data channel.
-     * @param logLevel The log level. Defaults to `none`.
-     * @param maxChunkLength The maximum amount of bytes used for a chunk
-     *   when fragmenting messages for a `SignalingTransportHandler`. Defaults
-     *   to 256 KiB. Note that this will still obey
-     *   `SignalingTransportHandler.maxMessageSize` as its upper limit.
      */
-    constructor(
-        handover: boolean = true,
-        logLevel: saltyrtc.LogLevel = 'none',
-        maxChunkLength: number = 262144,
+    public constructor(
+        version: saltyrtc.tasks.webrtc.WebRTCTaskVersion, logLevel: saltyrtc.LogLevel,
+        handover: boolean, maxChunkLength: number,
     ) {
-        this.doHandover = handover;
+        this.version = version;
         this.log = new saltyrtcClient.Log(logLevel);
+        this.doHandover = handover;
         this.maxChunkLength = maxChunkLength;
     }
 
@@ -114,22 +180,22 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     /**
      * The exclude field MUST contain an Array of WebRTC data channel IDs
-     * (non-negative integers) that SHALL not be used for the signalling
-     * channel. The client SHALL store this list for usage during handover.
+     * (non-negative integers less than 65535) that SHALL not be used for the
+     * signalling channel. The client SHALL store this list for usage during
+     * handover.
      */
     private processExcludeList(ids: number[]): void {
-        for (let id of ids) {
+        for (const id of ids) {
             this.exclude.add(id);
         }
-        for (let i = 0; i <= 65535; i++) {
+        for (let i = 0; i < 65535; i++) {
             if (!this.exclude.has(i)) {
                 this.channelId = i;
                 break;
             }
         }
         if (this.channelId === undefined && this.doHandover) {
-            const error = 'Exclude list is too restricting, no free data channel id can be found';
-            throw new Error(error);
+            throw new Error('No free data channel id can be found');
         }
     }
 
@@ -319,7 +385,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      * Return the task protocol name.
      */
     public getName(): string {
-        return WebRTCTask.PROTOCOL_NAME;
+        return `${this.version}.webrtc.tasks.saltyrtc.org`;
     }
 
     // noinspection JSMethodCanBeStatic
@@ -474,7 +540,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         // Return the transport link
         if (this.link === null) {
-            this.link = new SignalingTransportLink(this.channelId, WebRTCTask.PROTOCOL_NAME);
+            this.link = new SignalingTransportLink(this.channelId, this.getName());
         }
         return this.link;
     }

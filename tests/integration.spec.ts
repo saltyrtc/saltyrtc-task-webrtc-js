@@ -7,14 +7,14 @@
 
 /// <reference path="jasmine.d.ts" />
 
-import {WebRTCTask} from "../src/main";
+import {WebRTCTaskBuilder} from "../src/main";
 import {Config} from "./config";
 import {DummyTask} from "./testtasks";
 import {DataChannelCryptoContext} from "../src/crypto";
 
 type PeerContext = {
     signaling: saltyrtc.SaltyRTC,
-    task?: WebRTCTask,
+    task?: saltyrtc.tasks.webrtc.WebRTCTask,
     pc?: RTCPeerConnection,
     dc?: RTCDataChannel,
     link?: saltyrtc.tasks.webrtc.SignalingTransportLink,
@@ -78,14 +78,18 @@ export default () => {
 
         describe('WebRTCTask', () => {
             beforeEach(() => {
-                const initiatorTask = new WebRTCTask(undefined, LOG_LEVEL);
+                const initiatorTask = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .build();
                 const initiator = new saltyrtcClient.SaltyRTCBuilder()
                     .withLoggingLevel(LOG_LEVEL)
                     .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                     .withKeyStore(new saltyrtcClient.KeyStore())
                     .usingTasks([initiatorTask])
                     .asInitiator() as saltyrtc.SaltyRTC;
-                const responderTask = new WebRTCTask(undefined, LOG_LEVEL);
+                const responderTask = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .build();
                 const responder = new saltyrtcClient.SaltyRTCBuilder()
                     .withLoggingLevel(LOG_LEVEL)
                     .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
@@ -609,7 +613,10 @@ export default () => {
 
             it('cannot do handover if disabled via constructor', async () => {
                 const pair = this.pair as PeerContextPair;
-                pair.responder.task = new WebRTCTask(false, 'info');
+                pair.responder.task = new WebRTCTaskBuilder()
+                    .withLoggingLevel('info')
+                    .withHandover(false)
+                    .build();
                 pair.responder.signaling = new saltyrtcClient.SaltyRTCBuilder()
                     .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                     .withKeyStore(new saltyrtcClient.KeyStore())

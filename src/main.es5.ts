@@ -7,4 +7,4 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 import "../node_modules/@babel/polyfill/dist/polyfill"; // Include ES5 polyfills
-export {DataChannelCryptoContext, WebRTCTask} from "./main";
+export {DataChannelCryptoContext, WebRTCTaskBuilder} from "./main";
