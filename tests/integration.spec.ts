@@ -618,10 +618,11 @@ export default () => {
             it('cannot do handover if disabled via constructor', async () => {
                 const pair = this.pair as PeerContextPair;
                 pair.responder.task = new WebRTCTaskBuilder()
-                    .withLoggingLevel('info')
+                    .withLoggingLevel(LOG_LEVEL)
                     .withHandover(false)
                     .build();
                 pair.responder.signaling = new saltyrtcClient.SaltyRTCBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
                     .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
                     .withKeyStore(new saltyrtcClient.KeyStore())
                     .initiatorInfo(
@@ -635,6 +636,111 @@ export default () => {
                 const error = 'Handover has not been negotiated';
                 expect(() => pair.responder.task.getTransportLink()).toThrowError(error);
                 expect(() => pair.responder.task.handover(undefined)).toThrowError(error);
+            });
+
+            it('is backwards compatible to legacy v0', async () => {
+                const pair = this.pair as PeerContextPair;
+
+                // Initiator: Offers only v0
+                pair.initiator.task = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v0')
+                    .withMaxChunkLength(1337)
+                    .build();
+                pair.initiator.signaling = new saltyrtcClient.SaltyRTCBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                    .withKeyStore(new saltyrtcClient.KeyStore())
+                    .usingTasks([pair.initiator.task])
+                    .asInitiator() as saltyrtc.SaltyRTC;
+
+                // Responder: Offers v1 and v0
+                const responderTaskV1 = pair.responder.task;
+                pair.responder.task = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v0')
+                    .build();
+                pair.responder.signaling = new saltyrtcClient.SaltyRTCBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                    .withKeyStore(new saltyrtcClient.KeyStore())
+                    .initiatorInfo(
+                        pair.initiator.signaling.permanentKeyBytes,
+                        pair.initiator.signaling.authTokenBytes)
+                    .usingTasks([responderTaskV1, pair.responder.task])
+                    .asResponder() as saltyrtc.SaltyRTC;
+
+                // Ensure we can still interact just fine
+                await setupPeerConnection(pair);
+                expect(pair.initiator.dc.readyState).toEqual('open');
+                expect(pair.responder.dc.readyState).toEqual('open');
+
+                // Ensure the maximum chunk length (known as `max_packet_size`)
+                // has been negotiated.
+                // @ts-ignore
+                expect(pair.initiator.task.maxChunkLength).toBe(1337);
+                // @ts-ignore
+                expect(pair.responder.task.maxChunkLength).toBe(1337);
+            });
+
+            it('v1 is negotiated if both v1 and v0 are provided', async () => {
+                const pair = this.pair as PeerContextPair;
+
+                // Initiator: Offers v1 and v0 (in that order)
+                const initiatorMaxChunkLength = 1337;
+                pair.initiator.task = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v1')
+                    .withMaxChunkLength(initiatorMaxChunkLength)
+                    .build();
+                const initiatorTaskV0 = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v0')
+                    .withMaxChunkLength(initiatorMaxChunkLength)
+                    .build();
+                pair.initiator.signaling = new saltyrtcClient.SaltyRTCBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                    .withKeyStore(new saltyrtcClient.KeyStore())
+                    .usingTasks([pair.initiator.task, initiatorTaskV0])
+                    .asInitiator() as saltyrtc.SaltyRTC;
+
+                // Responder: Offers v1 and v0 (in that order)
+                const responderMaxChunkLength = 7331;
+                pair.responder.task = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v1')
+                    .withMaxChunkLength(responderMaxChunkLength)
+                    .build();
+                const responderTaskV0 = new WebRTCTaskBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .withVersion('v0')
+                    .withMaxChunkLength(responderMaxChunkLength)
+                    .build();
+                pair.responder.signaling = new saltyrtcClient.SaltyRTCBuilder()
+                    .withLoggingLevel(LOG_LEVEL)
+                    .connectTo(Config.SALTYRTC_HOST, Config.SALTYRTC_PORT)
+                    .withKeyStore(new saltyrtcClient.KeyStore())
+                    .initiatorInfo(
+                        pair.initiator.signaling.permanentKeyBytes,
+                        pair.initiator.signaling.authTokenBytes)
+                    .usingTasks([pair.responder.task, responderTaskV0])
+                    .asResponder() as saltyrtc.SaltyRTC;
+
+                // Ensure the v1 tasks have been chosen
+                await setupPeerConnection(pair);
+                expect(pair.initiator.signaling.getTask()).toBe(pair.initiator.task);
+                expect(pair.responder.signaling.getTask()).toBe(pair.responder.task);
+
+                // Ensure the maximum chunk length has NOT been negotiated
+                // @ts-ignore
+                expect(pair.initiator.task.maxChunkLength).toBe(initiatorMaxChunkLength);
+                // @ts-ignore
+                expect(pair.responder.task.maxChunkLength).toBe(responderMaxChunkLength);
+                // @ts-ignore
+                expect(initiatorTaskV0.maxChunkLength).toBe(initiatorMaxChunkLength);
+                // @ts-ignore
+                expect(responderTaskV0.maxChunkLength).toBe(responderMaxChunkLength);
             });
 
             function bindDataChannelEvents(role: string, dc: RTCDataChannel): void {
