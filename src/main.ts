@@ -7,4 +7,4 @@
  * of the MIT license.  See the `LICENSE.md` file for details.
  */
 export {DataChannelCryptoContext} from "./crypto";
-export {WebRTCTask} from "./task";
+export {WebRTCTaskBuilder} from "./task";

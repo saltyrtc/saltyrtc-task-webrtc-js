@@ -25,16 +25,20 @@ npm install --save @saltyrtc/task-webrtc @saltyrtc/client
 
 ## Usage
 
-When creating the task instance, you can specify whether or not a handover to a
-dedicated data channel is desired. 
+To create the task instance, you need to use the `WebRTCTaskBuilder` instance
+which can be used to configure the task before creating it.
+
+The below configuration represents the default values chosen by the builder as
+if you had not configured the builder and just called `.build()` directly.
 
 ```js
-const task = new WebRTCTask(true);
+const task = new WebRTCTaskBuilder()
+    .withLoggingLevel('none')
+    .withVersion('v1')
+    .withHandover(true)
+    .withMaxChunkLength(262144)
+    .build();
 ```
-
-If you don't specify any values, `handover` defaults to `true`, `logLevel`
-defaults to `info` and `maxChunkLength` used for the signalling transport
-defaults to 256 KiB.
 
 To send offers, answers and candidates, use the following task methods:
 
