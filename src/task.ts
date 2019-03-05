@@ -104,6 +104,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     // Data fields
     private static FIELD_EXCLUDE = 'exclude';
     private static FIELD_HANDOVER = 'handover';
+    private static FIELD_MAX_PACKET_SIZE = 'max_packet_size'; // legacy v0
 
     // Protocol version
     private readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
@@ -124,7 +125,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     // Signalling transport
     private doHandover: boolean;
-    private readonly maxChunkLength: number;
+    private maxChunkLength: number;
     private link: SignalingTransportLink | null = null;
     private transport: SignalingTransport | null = null;
 
@@ -174,6 +175,9 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     public init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
         this.processHandover(data[WebRTCTask.FIELD_HANDOVER] as boolean);
+        if (this.version === 'v0') {
+            this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE] as number);
+        }
         this.signaling = signaling;
         this.initialized = true;
     }
@@ -206,6 +210,30 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         if (handover === false) {
             this.doHandover = false;
         }
+    }
+
+    /**
+     * The max_packet_size field MUST contain either 0 or a positive integer.
+     * If one client's value is 0 but the other client's value is greater than
+     * 0, the larger of the two values SHALL be stored to be used for data
+     * channel communication. Otherwise, the minimum of both clients' maximum
+     * size SHALL be stored.
+     *
+     * Note: We don't care about the 0 case since this implementation will
+     *       never choose 0.
+     */
+    private processMaxPacketSize(remoteMaxPacketSize: number): void {
+        const localMaxPacketSize = this.maxChunkLength;
+        if (!Number.isInteger(remoteMaxPacketSize)) {
+            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be an integer');
+        }
+        if (remoteMaxPacketSize < 0) {
+            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
+        } else if (remoteMaxPacketSize > 0) {
+            this.maxChunkLength = Math.min(localMaxPacketSize, remoteMaxPacketSize);
+        }
+        this.log.debug(this.logTag, `Max packet size: Local requested ${localMaxPacketSize}` +
+            ` bytes, remote requested ${remoteMaxPacketSize} bytes. Using ${this.maxChunkLength}.`);
     }
 
     /**
@@ -410,6 +438,9 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
         data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
+        if (this.version === 'v0') {
+            data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.maxChunkLength;
+        }
         return data;
     }
 

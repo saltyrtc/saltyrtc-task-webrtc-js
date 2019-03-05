@@ -123,7 +123,7 @@ declare namespace saltyrtc.tasks.webrtc {
         receive(message: Uint8Array): void;
     }
 
-    type WebRTCTaskVersion = 'v1';
+    type WebRTCTaskVersion = 'v1' | 'v0';
 
     interface WebRTCTaskBuilder {
         withLoggingLevel(level: saltyrtc.LogLevel): WebRTCTaskBuilder;
