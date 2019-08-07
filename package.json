@@ -1,7 +1,7 @@
 {
   "name": "@saltyrtc/task-webrtc",
-  "version": "0.13.0",
-  "description": "A SaltyRTC WebRTC task implementation.",
+  "version": "0.14.0",
+  "description": "A SaltyRTC WebRTC task v1 implementation.",
   "main": "dist/saltyrtc-task-webrtc.es5.min.js",
   "module": "dist/saltyrtc-task-webrtc.es2015.js",
   "jsnext:main": "dist/saltyrtc-task-webrtc.es2015.js",
@@ -35,18 +35,17 @@
   },
   "homepage": "https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme",
   "dependencies": {
-    "@saltyrtc/chunked-dc": "^1.1.1"
+    "@saltyrtc/chunked-dc": "^2.0.1"
   },
   "peerDependencies": {
-    "@saltyrtc/client": "^0.13.2",
+    "@saltyrtc/client": "^0.14.3",
     "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0-rc.2",
     "@babel/polyfill": "^7.0.0-rc.2",
     "@babel/preset-env": "^7.0.0-rc.2",
-    "@saltyrtc/client": "^0.13.2",
-    "@types/webrtc": "0.0.23",
+    "@saltyrtc/client": "^0.14.3",
     "jasmine-core": "^3.2",
     "karma": "^3.0.0",
     "karma-chrome-launcher": "^2.2.0",
@@ -58,8 +57,8 @@
     "rollup-plugin-typescript": "^0.8.1",
     "rollup-plugin-uglify": "^4.0.0",
     "tweetnacl": "^1.0.0",
-    "typescript": "^2.9.2",
-    "webrtc-adapter": "^6.3.2"
+    "typescript": "^3.1",
+    "webrtc-adapter": "^7.2.1"
   },
   "files": [
     "dist",

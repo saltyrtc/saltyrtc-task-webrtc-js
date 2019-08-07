@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2018 Threema GmbH
+ * Copyright (C) 2016-2019 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the `LICENSE.md` file for details.
@@ -7,13 +7,90 @@
 
 /// <reference path='../saltyrtc-task-webrtc.d.ts' />
 
+import {DataChannelCryptoContext} from "./crypto";
+import {SignalingTransport, SignalingTransportLink} from "./transport";
+
 /**
- * WebRTC Task.
+ * Builds a WebRTCTask instance.
+ *
+ * The following default values are being used:
+ *
+ * - Version defaults to `v1`.
+ * - The log level defaults to `none`.
+ * - Handover is enabled by default.
+ * - The maximum chunk length for the handed over signalling channel is
+ *   256 KiB.
+ */
+export class WebRTCTaskBuilder implements saltyrtc.tasks.webrtc.WebRTCTaskBuilder {
+    private version: saltyrtc.tasks.webrtc.WebRTCTaskVersion = 'v1';
+    private logLevel: saltyrtc.LogLevel = 'none';
+    private handover: boolean = true;
+    private maxChunkLength: number = 262144;
+
+    /**
+     * Set the logging level.
+     *
+     * @param level The desired logging level.
+     */
+    public withLoggingLevel(level: saltyrtc.LogLevel): WebRTCTaskBuilder {
+        this.logLevel = level;
+        return this;
+    }
+
+    /**
+     * Set the task version.
+     *
+     * @param version The desired task version.
+     */
+    public withVersion(version: saltyrtc.tasks.webrtc.WebRTCTaskVersion): WebRTCTaskBuilder {
+        this.version = version;
+        return this;
+    }
+
+    /**
+     * Set whether handover should be negotiated.
+     *
+     * @param on Enable or disable handover.
+     */
+    public withHandover(on: boolean): WebRTCTaskBuilder {
+        this.handover = on;
+        return this;
+    }
+
+    /**
+     * Set the maximum chunk length in bytes for the handed over
+     * signalling channel.
+     *
+     * @param length The maximum byte length of a chunk.
+     *
+     * @throws Error in case the maximum chunk length is less or equal
+     *   to the chunking header.
+     */
+    public withMaxChunkLength(length: number): WebRTCTaskBuilder {
+        if (length <= chunkedDc.UNRELIABLE_UNORDERED_HEADER_LENGTH) {
+            throw new Error('Maximum chunk length must be greater than chunking overhead');
+        }
+        this.maxChunkLength = length;
+        return this;
+    }
+
+    /**
+     * Build the WebRTCTask instance.
+     * @returns WebRTCTask
+     */
+    public build(): WebRTCTask {
+        return new WebRTCTask(
+            this.version, this.logLevel, this.handover, this.maxChunkLength);
+    }
+}
+
+/**
+ * WebRTC Task Version 1.
  *
  * This task uses the end-to-end encryption techniques of SaltyRTC to set up a
  * secure WebRTC peer-to-peer connection. It also adds another security layer
- * for data channels that is available to users. The signalling channel will
- * persist after being handed over to a dedicated data channel once the
+ * for data channels that is available to applications. The signalling channel
+ * will persist after being handed over to a dedicated data channel once the
  * peer-to-peer connection has been set up. Therefore, further signalling
  * communication between the peers does not require a dedicated WebSocket
  * connection over a SaltyRTC server.
@@ -23,45 +100,34 @@
  * To send offer/answer/candidates, use the corresponding public methods on
  * this task.
  */
-import {SecureDataChannel} from "./datachannel";
-
 export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
-
-    // Constants as defined by the specification
-    private static PROTOCOL_NAME = 'v0.webrtc.tasks.saltyrtc.org';
-    private static DEFAULT_MAX_PACKET_SIZE = 16384;
-
     // Data fields
     private static FIELD_EXCLUDE = 'exclude';
-    private static FIELD_MAX_PACKET_SIZE = 'max_packet_size';
     private static FIELD_HANDOVER = 'handover';
+    private static FIELD_MAX_PACKET_SIZE = 'max_packet_size'; // legacy v0
 
-    // Other constants
-    private static DC_LABEL = 'saltyrtc-signaling';
+    // Protocol version
+    private readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
 
     // Logging
-    private log: saltyrtc.Log;
+    private readonly log: saltyrtc.Log;
     private logTag = '[SaltyRTC.WebRTC]';
 
     // Initialization state
     private initialized = false;
 
-    // Exclude list
-    private exclude: Set<number> = new Set();
-    private sdcId: number;
-
-    // Effective max packet size
-    private requestedMaxPacketSize: number;
-    private negotiatedMaxPacketSize: number;
-
-    // Whether to hand over
-    private doHandover = true;
+    // Channel ID and ID exclusion list
+    private readonly exclude: Set<number> = new Set();
+    private channelId: number;
 
     // Signaling
     private _signaling: saltyrtc.Signaling;
 
-    // Data channel
-    private sdc: saltyrtc.tasks.webrtc.SecureDataChannel = null;
+    // Signalling transport
+    private doHandover: boolean;
+    private maxChunkLength: number;
+    private link: SignalingTransportLink | null = null;
+    private transport: SignalingTransport | null = null;
 
     // Events
     private eventRegistry: saltyrtc.EventRegistry = new saltyrtcClient.EventRegistry();
@@ -73,20 +139,15 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
     /**
      * Create a new task instance.
-     *
-     * @param handover Set this parameter to `false` if you want to disable
-     *                 the signaling handover to a secure data channel.
-     * @param maxPacketSize The max packet size in bytes for a DataChannel chunk.
-     * @param logLevel The log level. Defaults to `none`.
      */
-    constructor(
-        handover: boolean = true,
-        maxPacketSize: number = WebRTCTask.DEFAULT_MAX_PACKET_SIZE,
-        logLevel: saltyrtc.LogLevel = 'none',
+    public constructor(
+        version: saltyrtc.tasks.webrtc.WebRTCTaskVersion, logLevel: saltyrtc.LogLevel,
+        handover: boolean, maxChunkLength: number,
     ) {
+        this.version = version;
         this.log = new saltyrtcClient.Log(logLevel);
         this.doHandover = handover;
-        this.requestedMaxPacketSize = maxPacketSize;
+        this.maxChunkLength = maxChunkLength;
     }
 
     /**
@@ -104,62 +165,42 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         return this._signaling;
     }
 
+    // noinspection JSUnusedGlobalSymbols
     /**
      * Initialize the task with the task data from the peer.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the
+     * application!
      */
-    init(signaling: saltyrtc.Signaling, data: Object): void {
+    public init(signaling: saltyrtc.Signaling, data: Object): void {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE] as number[]);
-        this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE] as number);
         this.processHandover(data[WebRTCTask.FIELD_HANDOVER] as boolean);
+        if (this.version === 'v0') {
+            this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE] as number);
+        }
         this.signaling = signaling;
         this.initialized = true;
     }
 
     /**
      * The exclude field MUST contain an Array of WebRTC data channel IDs
-     * (non-negative integers) that SHALL not be used for the signalling
-     * channel. The client SHALL store this list for usage during handover.
+     * (non-negative integers less than 65535) that SHALL not be used for the
+     * signalling channel. The client SHALL store this list for usage during
+     * handover.
      */
     private processExcludeList(ids: number[]): void {
-        for (let id of ids) {
+        for (const id of ids) {
             this.exclude.add(id);
         }
-        for (let i = 0; i <= 65535; i++) {
+        for (let i = 0; i < 65535; i++) {
             if (!this.exclude.has(i)) {
-                this.sdcId = i;
+                this.channelId = i;
                 break;
             }
         }
-        if (this.sdcId === undefined && this.doHandover === true) {
-            throw new Error('Exclude list is too big, no free data channel id can be found');
+        if (this.channelId === undefined && this.doHandover) {
+            throw new Error('No free data channel id can be found');
         }
-    }
-
-    /**
-     * The max_packet_size field MUST contain either 0 or a positive integer.
-     * If one client's value is 0 but the other client's value is greater than
-     * 0, the larger of the two values SHALL be stored to be used for data
-     * channel communication. Otherwise, the minimum of both clients' maximum
-     * size SHALL be stored.
-     */
-    private processMaxPacketSize(maxPacketSize: number): void {
-        if (!Number.isInteger(maxPacketSize)) {
-            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be an integer');
-        }
-        if (maxPacketSize < 0) {
-            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
-        }
-        if (maxPacketSize === 0 && this.requestedMaxPacketSize === 0) {
-            this.negotiatedMaxPacketSize = 0;
-        } else if (maxPacketSize === 0 || this.requestedMaxPacketSize === 0) {
-            this.negotiatedMaxPacketSize = Math.max(maxPacketSize, this.requestedMaxPacketSize);
-        } else {
-            this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
-        }
-        this.log.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize,
-                        'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
     }
 
     /**
@@ -172,14 +213,38 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
+     * The max_packet_size field MUST contain either 0 or a positive integer.
+     * If one client's value is 0 but the other client's value is greater than
+     * 0, the larger of the two values SHALL be stored to be used for data
+     * channel communication. Otherwise, the minimum of both clients' maximum
+     * size SHALL be stored.
+     *
+     * Note: We don't care about the 0 case since this implementation will
+     *       never choose 0.
+     */
+    private processMaxPacketSize(remoteMaxPacketSize: number): void {
+        const localMaxPacketSize = this.maxChunkLength;
+        if (!Number.isInteger(remoteMaxPacketSize)) {
+            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be an integer');
+        }
+        if (remoteMaxPacketSize < 0) {
+            throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
+        } else if (remoteMaxPacketSize > 0) {
+            this.maxChunkLength = Math.min(localMaxPacketSize, remoteMaxPacketSize);
+        }
+        this.log.debug(this.logTag, `Max packet size: Local requested ${localMaxPacketSize}` +
+            ` bytes, remote requested ${remoteMaxPacketSize} bytes. Using ${this.maxChunkLength}.`);
+    }
+
+    /**
      * Used by the signaling class to notify task that the peer handshake is over.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the application!
      */
-    onPeerHandshakeDone(): void {
+    public onPeerHandshakeDone(): void {
         // Do nothing.
-        // The user should wait for a signaling state change to TASK.
-        // Then he can start by sending an offer.
+        // The application should wait for a signaling state change to TASK.
+        // Then it can start by sending an offer.
     }
 
     /**
@@ -188,18 +253,19 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
      *
      * @param id The responder ID of the peer that disconnected.
      */
-    onDisconnected(id: number): void {
+    public onDisconnected(id: number): void {
         // A 'disconnected' message arrived.
-        // Notify the user application.
+        // Notify the application.
         this.emit({type: 'disconnected', data: id});
     }
 
     /**
      * Handle incoming task messages.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the
+     * application!
      */
-    onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
+    public onTaskMessage(message: saltyrtc.messages.TaskMessage): void {
         this.log.debug(this.logTag, 'New task message arrived: ' + message.type);
         switch (message.type) {
             case 'offer':
@@ -215,15 +281,31 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
                 this.emit({type: 'candidates', data: message['candidates']});
                 break;
             case 'handover':
-                if (this.doHandover === false) {
+                // Ensure handover has been negotiated
+                if (!this.doHandover) {
                     this.log.error(this.logTag, 'Received unexpected handover message from peer');
                     this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
                     break;
                 }
-                if (this.signaling.handoverState.local === false) {
-                    this.sendHandover();
+
+                // Discard repeated handover requests
+                if (this.signaling.handoverState.peer) {
+                    // Note: This is not being treated as a protocol error since previous
+                    //       versions had a race condition that could trigger multiple
+                    //       sends of 'handover'.
+                    this.log.warn(this.logTag, 'Handover already received');
+                    break;
                 }
+
+                // Update state
                 this.signaling.handoverState.peer = true;
+
+                // Flush the message queue of the signaling transport (if any)
+                if (this.transport !== null) {
+                    this.transport.flushMessageQueue();
+                }
+
+                // Handover process completed?
                 if (this.signaling.handoverState.both) {
                     this.log.info(this.logTag, 'Handover to data channel finished');
                 }
@@ -277,16 +359,22 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
         }
         for (let candidate of message['candidates']) {
             if (candidate !== null) {
-                if (typeof candidate['candidate'] !== 'string' && !(candidate['candidate'] instanceof String)) {
-                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (candidate field)');
+                if (typeof candidate['candidate'] !== 'string'
+                    && !(candidate['candidate'] instanceof String)) {
+                    this.log.warn(this.logTag,
+                        'Candidates message contains invalid candidate (candidate field)');
                     return false;
                 }
-                if (typeof candidate['sdpMid'] !== 'string' && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
-                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMid field)');
+                if (typeof candidate['sdpMid'] !== 'string'
+                    && !(candidate['sdpMid'] instanceof String) && candidate['sdpMid'] !== null) {
+                    this.log.warn(this.logTag,
+                        'Candidates message contains invalid candidate (sdpMid field)');
                     return false;
                 }
-                if (candidate['sdpMLineIndex'] !== null && !Number.isInteger(candidate['sdpMLineIndex'])) {
-                    this.log.warn(this.logTag, 'Candidates message contains invalid candidate (sdpMLineIndex field)');
+                if (candidate['sdpMLineIndex'] !== null
+                    && !Number.isInteger(candidate['sdpMLineIndex'])) {
+                    this.log.warn(this.logTag,
+                        'Candidates message contains invalid candidate (sdpMLineIndex field)');
                     return false;
                 }
             }
@@ -295,72 +383,65 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Send a signaling message *through the data channel*.
+     * Send a signaling message through a data channel.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the
+     * application!
      *
      * @param payload Non-encrypted message. The message will be encrypted by
-     *   the underlying secure data channel.
+     *   the underlying data channel.
      * @throws SignalingError when signaling or handover state are not correct.
      */
-    sendSignalingMessage(payload: Uint8Array) {
+    public sendSignalingMessage(payload: Uint8Array) {
         if (this.signaling.getState() != 'task') {
             throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
-                'Could not send signaling message: Signaling state is not open.');
+                "Could not send signaling message: Signaling state is not 'task'.");
         }
-        if (this.signaling.handoverState.local === false) {
+        if (!this.signaling.handoverState.local) {
             throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
-                'Could not send signaling message: Handover hasn\'t happened yet.');
+                "Could not send signaling message: Handover hasn't happened yet.");
         }
-        this.sdc.send(payload);
+        if (this.transport === null) {
+            throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError,
+                'Could not send signaling message: Data channel is not established, yet.');
+        }
+        this.transport.send(payload);
     }
 
+    // noinspection JSMethodCanBeStatic
     /**
      * Return the task protocol name.
      */
     public getName(): string {
-        return WebRTCTask.PROTOCOL_NAME;
+        return `${this.version}.webrtc.tasks.saltyrtc.org`;
     }
 
+    // noinspection JSMethodCanBeStatic
     /**
      * Return the list of supported message types.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the
+     * application!
      */
-    getSupportedMessageTypes(): string[] {
+    public getSupportedMessageTypes(): string[] {
         return ['offer', 'answer', 'candidates', 'handover'];
     }
 
-    /**
-     * Return the negotiated max packet size, or `null` if the task has not yet been initialized.
-     */
-    public getMaxPacketSize(): number {
-        if (this.initialized === true) {
-            return this.negotiatedMaxPacketSize;
-        }
-        return null;
-    }
-
+    // noinspection JSUnusedGlobalSymbols
     /**
      * Return the task data used for negotiation in the `auth` message.
      *
-     * This method should only be called by the signaling class, not by the end user!
+     * This method should only be called by the signaling class, not by the
+     * application!
      */
-    getData(): Object {
+    public getData(): Object {
         const data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
-        data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.requestedMaxPacketSize;
         data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
+        if (this.version === 'v0') {
+            data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.maxChunkLength;
+        }
         return data;
-    }
-
-    /**
-     * Return a reference to the signaling instance.
-     *
-     * This method should only be called by the signaling class, not by the end user!
-     */
-    getSignaling(): saltyrtc.Signaling {
-        return this.signaling;
     }
 
     /**
@@ -441,83 +522,92 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
 
         // Add a new timeout if one isn't in progress already
         if (this.sendCandidatesTimeout === null) {
-            this.sendCandidatesTimeout = window.setTimeout(sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
+            this.sendCandidatesTimeout = self.setTimeout(
+                sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
         }
     }
 
     /**
-     * Do the handover from WebSocket to WebRTC data channel on the specified peer connection.
+     * Create a `SignalingTransportLink` to be used by the application for the
+     * handover process.
      *
-     * Return a boolean indicating whether the handover has been initiated.
+     * If the application wishes to hand over the signalling channel, it MUST
+     * create an `RTCDataChannel` instance with the following properties:
      *
-     * This operation is asynchronous. To get notified when the handover is finished, subscribe to
-     * the SaltyRTC `handover` event.
+     * - `negotiated` must be `true`,
+     * - `ordered` must be `true`, and
+     * - further properties are `label`, `id` and `protocol` as passed to
+     *   the factory (attributes of `SignalingTransportLink`) which SHALL NOT
+     *   be modified by the application.
+     *
+     * Once the `RTCDataChannel` instance moves into the `open` state, the
+     * `SignalingTransportHandler` SHALL be created. The handover process
+     * MUST be initiated immediately (without yielding back to the event loop)
+     * once the `open` event fires to prevent messages from being lost.
+     *
+     * In case the `RTCDataChannel` instance moves into the `closed` state or
+     * errors before opening, the application SHALL NOT start the handover
+     * process.
+     *
+     * @return all necessary information to create a dedicated `RTCDataChannel`
+     * and contains functions for forwarding events and messages.
+     *
+     * @throws Error in case handover has not been negotiated or no free
+     *   channel id could be determined during negotiation.
      */
-    public handover(pc: RTCPeerConnection): boolean {
+    public getTransportLink(): saltyrtc.tasks.webrtc.SignalingTransportLink {
+        this.log.debug(this.logTag, 'Create signalling transport link');
+
+        // Make sure handover has been negotiated
+        if (!this.doHandover) {
+            throw new Error('Handover has not been negotiated');
+        }
+
+        // Make sure the data channel id is set
+        if (this.channelId === undefined) {
+            const error = 'Data channel id not set';
+            throw new Error(error);
+        }
+
+        // Return the transport link
+        if (this.link === null) {
+            this.link = new SignalingTransportLink(this.channelId, this.getName());
+        }
+        return this.link;
+    }
+
+    /**
+     * Initiate the handover from WebSocket to a dedicated data channel.
+     *
+     * This operation is asynchronous. To get notified when the handover is
+     * finished, subscribe to the SaltyRTC `handover` event.
+     *
+     * @throws Error in case handover already requested or has not been
+     *   negotiated.
+     */
+    public handover(handler: saltyrtc.tasks.webrtc.SignalingTransportHandler): void {
         this.log.debug(this.logTag, 'Initiate handover');
 
-        // Make sure this is intended
-        if (this.doHandover === false) {
-            this.log.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
-            return false;
+        // Make sure handover has been negotiated
+        if (!this.doHandover) {
+            throw new Error('Handover has not been negotiated');
         }
 
-        // Make sure handover hasn't already happened
-        if (this.signaling.handoverState.any) {
-            this.log.error(this.logTag, 'Handover already in progress or finished');
-            return false;
+        // Make sure handover has not already been requested
+        if (this.signaling.handoverState.local || this.transport !== null) {
+            throw new Error('Handover already requested');
         }
 
-        // Make sure the dc id is set
-        if (this.sdcId === undefined || this.sdcId === null) {
-            this.log.error(this.logTag, 'Data channel id not set');
-            this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
-            throw new Error('Data channel id not set');
-        }
+        // Create crypto context and new signalling transport
+        const crypto = this.createCryptoContext(this.channelId);
+        this.transport = new SignalingTransport(
+            this.link, handler, this, this.signaling, crypto, this.log.level, this.maxChunkLength);
 
-        // Configure new data channel
-        const dc: RTCDataChannel = pc.createDataChannel(WebRTCTask.DC_LABEL, {
-            id: this.sdcId,
-            negotiated: true,
-            ordered: true,
-            protocol: WebRTCTask.PROTOCOL_NAME,
-        });
-        dc.binaryType = 'arraybuffer';
-
-        // Wrap data channel
-        this.sdc = new SecureDataChannel(dc, this, this.log.level);
-
-        // Attach event handlers
-
-        this.sdc.onopen = (ev: Event) => {
-            // Send handover message
-            this.sendHandover();
-        };
-
-        this.sdc.onclose = (ev: Event) => {
-            // If handover has already happened, set signaling state to closed
-            if (this.signaling.handoverState.any) {
-                this.signaling.setState('closed');
-            }
-        };
-
-        this.sdc.onerror = (ev: Event) => {
-            // Log error
-            this.log.error(this.logTag, 'Signaling data channel error:', ev);
-        };
-
-        this.sdc.onbufferedamountlow = (ev: Event) => {
-            // Log warning
-            this.log.warn(this.logTag, 'Signaling data channel: Buffered amount low:', ev);
-        };
-
-        this.sdc.onmessage = (ev: MessageEvent) => {
-            // Pass decrypted incoming signaling messages to signaling class
-            let decryptedData = new Uint8Array(ev.data);
-            this.signaling.onSignalingPeerMessage(decryptedData);
-        };
-
-        return true;
+        // Send handover message
+        // Note: This will still be sent via the original transport since the
+        //       switching logic depends on the local handover state which
+        //       SHALL NOT be altered before this call.
+        this.sendHandover();
     }
 
     /**
@@ -546,29 +636,28 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     }
 
     /**
-     * Return a wrapped data channel.
+     * Return a crypto context to encrypt and decrypt data for a data channel
+     * with a specific id.
      *
-     * Only call this method *after* handover has taken place!
-     *
-     * @param dc The data channel to be wrapped.
-     * @return A `SecureDataChannel` instance.
+     * @param channelId The data channel's id.
      */
-    public wrapDataChannel(dc: RTCDataChannel): saltyrtc.tasks.webrtc.SecureDataChannel {
-        this.log.debug(this.logTag, "Wrapping data channel", dc.id);
-        return new SecureDataChannel(dc, this, this.log.level);
+    public createCryptoContext(channelId: number): DataChannelCryptoContext {
+        return new DataChannelCryptoContext(channelId, this.signaling);
     }
 
+    // noinspection JSUnusedGlobalSymbols
     /**
      * Close the signaling data channel.
      *
      * @param reason The close code.
      */
     public close(reason: number): void {
-        this.log.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
-        if (this.sdc !== null) {
-            this.sdc.close();
+        this.log.debug(this.logTag, 'Closing signaling data channel:',
+            saltyrtcClient.explainCloseCode(reason));
+        if (this.transport !== null) {
+            this.transport.close();
         }
-        this.sdc = null;
+        this.transport = null;
     }
 
     /**
@@ -643,5 +732,4 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
             this.eventRegistry.unregister(event.type, handler);
         }
     }
-
 }
