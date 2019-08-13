@@ -1,9 +1,9 @@
 /**
- * saltyrtc-task-webrtc v0.13.0
- * A SaltyRTC WebRTC task implementation.
+ * saltyrtc-task-webrtc v0.14.0
+ * A SaltyRTC WebRTC task v1 implementation.
  * https://github.com/saltyrtc/saltyrtc-task-webrtc-js#readme
  *
- * Copyright (C) 2016-2018 Threema GmbH
+ * Copyright (C) 2016-2019 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license:
@@ -28,7 +28,7 @@
  */
 'use strict';
 
-var saltyrtcTaskWebrtc = (function (exports,nacl) {
+var saltyrtcTaskWebrtc = (function (exports) {
   'use strict';
 
   function _classCallCheck(instance, Constructor) {
@@ -79,63 +79,38 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
     function DataChannelNonce(cookie, channelId, overflow, sequenceNumber) {
       _classCallCheck(this, DataChannelNonce);
 
-      this._cookie = cookie;
-      this._overflow = overflow;
-      this._sequenceNumber = sequenceNumber;
-      this._channelId = channelId;
+      this.cookie = cookie;
+      this.overflow = overflow;
+      this.sequenceNumber = sequenceNumber;
+      this.channelId = channelId;
     }
 
     _createClass(DataChannelNonce, [{
-      key: "toArrayBuffer",
-      value: function toArrayBuffer() {
-        var buf = new ArrayBuffer(DataChannelNonce.TOTAL_LENGTH);
-        var uint8view = new Uint8Array(buf);
-        uint8view.set(this._cookie.bytes);
-        var view = new DataView(buf);
-        view.setUint16(16, this._channelId);
-        view.setUint16(18, this._overflow);
-        view.setUint32(20, this._sequenceNumber);
-        return buf;
-      }
-    }, {
       key: "toUint8Array",
       value: function toUint8Array() {
-        return new Uint8Array(this.toArrayBuffer());
-      }
-    }, {
-      key: "cookie",
-      get: function get() {
-        return this._cookie;
-      }
-    }, {
-      key: "overflow",
-      get: function get() {
-        return this._overflow;
-      }
-    }, {
-      key: "sequenceNumber",
-      get: function get() {
-        return this._sequenceNumber;
+        var buffer = new Uint8Array(DataChannelNonce.TOTAL_LENGTH);
+        buffer.set(this.cookie.bytes);
+        var view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        view.setUint16(16, this.channelId);
+        view.setUint16(18, this.overflow);
+        view.setUint32(20, this.sequenceNumber);
+        return buffer;
       }
     }, {
       key: "combinedSequenceNumber",
       get: function get() {
-        return (this._overflow << 32) + this._sequenceNumber;
-      }
-    }, {
-      key: "channelId",
-      get: function get() {
-        return this._channelId;
+        return this.overflow * Math.pow(2, 32) + this.sequenceNumber;
       }
     }], [{
-      key: "fromArrayBuffer",
-      value: function fromArrayBuffer(packet) {
-        if (packet.byteLength != DataChannelNonce.TOTAL_LENGTH) {
-          throw 'bad-packet-length';
+      key: "fromUint8Array",
+      value: function fromUint8Array(data) {
+        if (data.byteLength !== this.TOTAL_LENGTH) {
+          throw new saltyrtcClient.exceptions.ValidationError('Bad packet length');
         }
 
-        var view = new DataView(packet);
-        var cookie = new saltyrtcClient.Cookie(new Uint8Array(packet, 0, 16));
+        var view = new DataView(data.buffer, data.byteOffset, this.TOTAL_LENGTH);
+        var slice = new Uint8Array(data.buffer, data.byteOffset, saltyrtcClient.Cookie.COOKIE_LENGTH);
+        var cookie = new saltyrtcClient.Cookie(slice);
         var channelId = view.getUint16(16);
         var overflow = view.getUint16(18);
         var sequenceNumber = view.getUint32(20);
@@ -148,359 +123,346 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
 
   DataChannelNonce.TOTAL_LENGTH = 24;
 
-  var SecureDataChannel =
+  var DataChannelCryptoContext =
   /*#__PURE__*/
   function () {
-    function SecureDataChannel(dc, task) {
-      var _this = this;
+    function DataChannelCryptoContext(channelId, signaling) {
+      _classCallCheck(this, DataChannelCryptoContext);
 
-      var logLevel = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 'none';
-
-      _classCallCheck(this, SecureDataChannel);
-
-      this.logTag = '[SaltyRTC.SecureDataChannel]';
-      this.messageNumber = 0;
-      this.chunkCount = 0;
-
-      this.onChunk = function (event) {
-        _this.log.debug(_this.logTag, 'Received chunk');
-
-        if (event.data instanceof Blob) {
-          _this.log.warn(_this.logTag, 'Received message in blob format, which is not currently supported.');
-
-          return;
-        } else if (typeof event.data == 'string') {
-          _this.log.warn(_this.logTag, 'Received message in string format, which is not currently supported.');
-
-          return;
-        } else if (!(event.data instanceof ArrayBuffer)) {
-          _this.log.warn(_this.logTag, 'Received message in unsupported format. Please send ArrayBuffer objects.');
-
-          return;
-        }
-
-        _this.unchunker.add(event.data, event);
-
-        if (_this.chunkCount++ > SecureDataChannel.CHUNK_COUNT_GC) {
-          _this.unchunker.gc(SecureDataChannel.CHUNK_MAX_AGE);
-
-          _this.chunkCount = 0;
-        }
-      };
-
-      this.onEncryptedMessage = function (data, context) {
-        if (_this._onmessage === undefined) {
-          return;
-        }
-
-        _this.log.debug(_this.logTag, 'Decrypting incoming data...');
-
-        var realEvent = context[context.length - 1];
-        var fakeEvent = {};
-
-        for (var x in realEvent) {
-          fakeEvent[x] = realEvent[x];
-        }
-
-        var box = saltyrtcClient.Box.fromUint8Array(new Uint8Array(data), nacl.box.nonceLength);
-
-        try {
-          _this.validateNonce(DataChannelNonce.fromArrayBuffer(box.nonce.buffer));
-        } catch (e) {
-          _this.log.error(_this.logTag, 'Invalid nonce:', e);
-
-          _this.log.error(_this.logTag, 'Closing data channel');
-
-          _this.close();
-
-          _this.task.close(saltyrtcClient.CloseCode.ProtocolError);
-
-          return;
-        }
-
-        var decrypted = _this.task.getSignaling().decryptFromPeer(box);
-
-        fakeEvent['data'] = decrypted.buffer.slice(decrypted.byteOffset, decrypted.byteOffset + decrypted.byteLength);
-
-        _this._onmessage.bind(_this.dc)(fakeEvent);
-      };
-
-      if (dc.binaryType !== 'arraybuffer') {
-        throw new Error('Currently SaltyRTC can only handle data channels ' + 'with `binaryType` set to `arraybuffer`.');
-      }
-
-      this.dc = dc;
-      this.task = task;
-      this.log = new saltyrtcClient.Log(logLevel);
+      this.lastIncomingCsn = null;
+      this.channelId = channelId;
+      this.signaling = signaling;
       this.cookiePair = new saltyrtcClient.CookiePair();
       this.csnPair = new saltyrtcClient.CombinedSequencePair();
-      this.chunkSize = this.task.getMaxPacketSize();
-
-      if (this.chunkSize === null) {
-        throw new Error('Could not determine max chunk size');
-      }
-
-      if (this.chunkSize === 0) {
-        this.dc.onmessage = function (event) {
-          return _this.onEncryptedMessage(event.data, [event]);
-        };
-      } else {
-        this.unchunker = new chunkedDc.Unchunker();
-        this.unchunker.onMessage = this.onEncryptedMessage;
-        this.dc.onmessage = this.onChunk;
-      }
     }
 
-    _createClass(SecureDataChannel, [{
-      key: "send",
-      value: function send(data) {
-        var buffer;
-
-        if (typeof data === 'string') {
-          throw new Error('SecureDataChannel can only handle binary data.');
-        } else if (data instanceof Blob) {
-          throw new Error('SecureDataChannel does not currently support Blob data. ' + 'Please pass in an ArrayBuffer or a typed array (e.g. Uint8Array).');
-        } else if (data instanceof Int8Array || data instanceof Uint8ClampedArray || data instanceof Int16Array || data instanceof Uint16Array || data instanceof Int32Array || data instanceof Uint32Array || data instanceof Float32Array || data instanceof Float64Array || data instanceof DataView) {
-          var start = data.byteOffset || 0;
-          var end = start + (data.byteLength || data.buffer.byteLength);
-          buffer = data.buffer.slice(start, end);
-        } else if (data instanceof Uint8Array) {
-          buffer = data.buffer;
-        } else if (data instanceof ArrayBuffer) {
-          buffer = data;
-        } else {
-          throw new Error('Unknown data type. Please pass in an ArrayBuffer ' + 'or a typed array (e.g. Uint8Array).');
-        }
-
-        var box = this.encryptData(new Uint8Array(buffer));
-        var encryptedBytes = box.toUint8Array();
-
-        if (this.chunkSize === 0) {
-          this.dc.send(encryptedBytes);
-        } else {
-          var chunker = new chunkedDc.Chunker(this.messageNumber++, encryptedBytes, this.chunkSize);
-          var _iteratorNormalCompletion = true;
-          var _didIteratorError = false;
-          var _iteratorError = undefined;
-
-          try {
-            for (var _iterator = chunker[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-              var chunk = _step.value;
-              this.dc.send(chunk);
-            }
-          } catch (err) {
-            _didIteratorError = true;
-            _iteratorError = err;
-          } finally {
-            try {
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-            } finally {
-              if (_didIteratorError) {
-                throw _iteratorError;
-              }
-            }
-          }
-        }
-      }
-    }, {
-      key: "encryptData",
-      value: function encryptData(data) {
+    _createClass(DataChannelCryptoContext, [{
+      key: "encrypt",
+      value: function encrypt(data) {
         var csn = this.csnPair.ours.next();
-        var nonce = new DataChannelNonce(this.cookiePair.ours, this.dc.id, csn.overflow, csn.sequenceNumber);
-        var encrypted = this.task.getSignaling().encryptForPeer(data, nonce.toUint8Array());
-        return encrypted;
+        var nonce = new DataChannelNonce(this.cookiePair.ours, this.channelId, csn.overflow, csn.sequenceNumber);
+        return this.signaling.encryptForPeer(data, nonce.toUint8Array());
       }
     }, {
-      key: "validateNonce",
-      value: function validateNonce(nonce) {
+      key: "decrypt",
+      value: function decrypt(box) {
+        var nonce;
+
+        try {
+          nonce = DataChannelNonce.fromUint8Array(box.nonce);
+        } catch (error) {
+          throw new saltyrtcClient.exceptions.ValidationError("Unable to create nonce, reason: ".concat(error));
+        }
+
         if (nonce.cookie.equals(this.cookiePair.ours)) {
-          throw new Error('Local and remote cookie are equal');
+          throw new saltyrtcClient.exceptions.ValidationError('Local and remote cookie are equal');
         }
 
         if (this.cookiePair.theirs === null || this.cookiePair.theirs === undefined) {
           this.cookiePair.theirs = nonce.cookie;
         } else if (!nonce.cookie.equals(this.cookiePair.theirs)) {
-          throw new Error("Remote cookie changed");
+          throw new saltyrtcClient.exceptions.ValidationError('Remote cookie changed');
         }
 
-        if (this.lastIncomingCsn != null && nonce.combinedSequenceNumber == this.lastIncomingCsn) {
-          throw new Error("CSN reuse detected!");
+        if (this.lastIncomingCsn !== null && nonce.combinedSequenceNumber === this.lastIncomingCsn) {
+          throw new saltyrtcClient.exceptions.ValidationError('CSN reuse detected');
         }
 
-        if (nonce.channelId != this.dc.id) {
-          throw new Error("Data channel id in nonce does not match actual data channel id");
+        if (nonce.channelId !== this.channelId) {
+          var error = 'Data channel id in nonce does not match';
+          throw new saltyrtcClient.exceptions.ValidationError(error);
         }
 
         this.lastIncomingCsn = nonce.combinedSequenceNumber;
+        return this.signaling.decryptFromPeer(box);
+      }
+    }]);
+
+    return DataChannelCryptoContext;
+  }();
+
+  DataChannelCryptoContext.OVERHEAD_LENGTH = 40;
+  DataChannelCryptoContext.NONCE_LENGTH = DataChannelNonce.TOTAL_LENGTH;
+
+  var SignalingTransportLink =
+  /*#__PURE__*/
+  function () {
+    function SignalingTransportLink(id, protocol) {
+      _classCallCheck(this, SignalingTransportLink);
+
+      this.label = 'saltyrtc-signaling';
+      this.id = id;
+      this.protocol = protocol;
+      this.untie();
+    }
+
+    _createClass(SignalingTransportLink, [{
+      key: "untie",
+      value: function untie() {
+        this.closed = function () {
+          throw new Error('closed: Not tied to a SignalingTransport');
+        };
+
+        this.receive = function () {
+          throw new Error('receive: Not tied to a SignalingTransport');
+        };
+      }
+    }, {
+      key: "tie",
+      value: function tie(transport) {
+        this.closed = transport.closed.bind(transport);
+        this.receive = transport.receiveChunk.bind(transport);
+      }
+    }]);
+
+    return SignalingTransportLink;
+  }();
+
+  var SignalingTransport =
+  /*#__PURE__*/
+  function () {
+    function SignalingTransport(link, handler, task, signaling, crypto, logLevel, maxChunkLength) {
+      _classCallCheck(this, SignalingTransport);
+
+      this.logTag = '[SaltyRTC.WebRTC.SignalingTransport]';
+      this.messageId = 0;
+      this.log = new saltyrtcClient.Log(logLevel);
+      this.link = link;
+      this.handler = handler;
+      this.task = task;
+      this.signaling = signaling;
+      this.crypto = crypto;
+      this.chunkLength = Math.min(this.handler.maxMessageSize, maxChunkLength);
+      this.chunkBuffer = new ArrayBuffer(this.chunkLength);
+      this.messageQueue = this.signaling.handoverState.peer ? null : [];
+      this.unchunker = new chunkedDc.UnreliableUnorderedUnchunker();
+      this.unchunker.onMessage = this.receiveMessage.bind(this);
+      this.link.tie(this);
+      this.log.info(this.logTag, 'Signaling transport created');
+    }
+
+    _createClass(SignalingTransport, [{
+      key: "closed",
+      value: function closed() {
+        this.log.info('Closed (remote)');
+        this.unbind();
+
+        if (this.signaling.handoverState.any) {
+          this.signaling.setState('closed');
+        }
+      }
+    }, {
+      key: "receiveChunk",
+      value: function receiveChunk(chunk) {
+        this.log.debug(this.logTag, 'Received chunk');
+
+        try {
+          this.unchunker.add(chunk);
+        } catch (error) {
+          this.log.error(this.logTag, 'Invalid chunk:', error);
+          return this.die();
+        }
+      }
+    }, {
+      key: "receiveMessage",
+      value: function receiveMessage(message) {
+        this.log.debug(this.logTag, 'Received message');
+        var box = saltyrtcClient.Box.fromUint8Array(message, DataChannelCryptoContext.NONCE_LENGTH);
+
+        try {
+          message = this.crypto.decrypt(box);
+        } catch (error) {
+          this.log.error(this.logTag, 'Invalid nonce:', error);
+          return this.die();
+        }
+
+        if (!this.signaling.handoverState.peer) {
+          this.messageQueue.push(message);
+          return;
+        }
+
+        this.signaling.onSignalingPeerMessage(message);
+      }
+    }, {
+      key: "flushMessageQueue",
+      value: function flushMessageQueue() {
+        if (!this.signaling.handoverState.peer) {
+          throw new Error('Remote did not request handover');
+        }
+
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = this.messageQueue[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var message = _step.value;
+            this.signaling.onSignalingPeerMessage(message);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        this.messageQueue = null;
+      }
+    }, {
+      key: "send",
+      value: function send(message) {
+        this.log.debug(this.logTag, 'Sending message');
+        var box = this.crypto.encrypt(message);
+        message = box.toUint8Array();
+        var chunker = new chunkedDc.UnreliableUnorderedChunker(this.messageId++, message, this.chunkLength, this.chunkBuffer);
+        var _iteratorNormalCompletion2 = true;
+        var _didIteratorError2 = false;
+        var _iteratorError2 = undefined;
+
+        try {
+          for (var _iterator2 = chunker[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+            var chunk = _step2.value;
+            this.log.debug(this.logTag, 'Sending chunk');
+
+            try {
+              this.handler.send(chunk);
+            } catch (error) {
+              this.log.error(this.logTag, 'Unable to send chunk:', error);
+              return this.die();
+            }
+          }
+        } catch (err) {
+          _didIteratorError2 = true;
+          _iteratorError2 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
+              _iterator2.return();
+            }
+          } finally {
+            if (_didIteratorError2) {
+              throw _iteratorError2;
+            }
+          }
+        }
       }
     }, {
       key: "close",
       value: function close() {
-        this.dc.close();
-      }
-    }, {
-      key: "addEventListener",
-      value: function addEventListener(type, listener, useCapture) {
-        if (type === 'message') {
-          throw new Error('addEventListener on message events is not currently supported by SaltyRTC.');
-        } else {
-          this.dc.addEventListener(type, listener, useCapture);
+        try {
+          this.handler.close();
+        } catch (error) {
+          this.log.error(this.logTag, 'Unable to close data channel:', error);
         }
+
+        this.log.info('Closed (local)');
+        this.unbind();
       }
     }, {
-      key: "removeEventListener",
-      value: function removeEventListener(type, listener, useCapture) {
-        if (type === 'message') {
-          throw new Error('removeEventListener on message events is not currently supported by SaltyRTC.');
-        } else {
-          this.dc.removeEventListener(type, listener, useCapture);
-        }
+      key: "die",
+      value: function die() {
+        this.log.warn(this.logTag, 'Closing task due to an error');
+        this.task.close(saltyrtcClient.CloseCode.ProtocolError);
       }
     }, {
-      key: "dispatchEvent",
-      value: function dispatchEvent(e) {
-        return this.dc.dispatchEvent(e);
-      }
-    }, {
-      key: "label",
-      get: function get() {
-        return this.dc.label;
-      }
-    }, {
-      key: "ordered",
-      get: function get() {
-        return this.dc.ordered;
-      }
-    }, {
-      key: "maxPacketLifeTime",
-      get: function get() {
-        return this.dc.maxPacketLifeTime;
-      }
-    }, {
-      key: "maxRetransmits",
-      get: function get() {
-        return this.dc.maxRetransmits;
-      }
-    }, {
-      key: "protocol",
-      get: function get() {
-        return this.dc.protocol;
-      }
-    }, {
-      key: "negotiated",
-      get: function get() {
-        return this.dc.negotiated;
-      }
-    }, {
-      key: "id",
-      get: function get() {
-        return this.dc.id;
-      }
-    }, {
-      key: "readyState",
-      get: function get() {
-        return this.dc.readyState;
-      }
-    }, {
-      key: "bufferedAmount",
-      get: function get() {
-        return this.dc.bufferedAmount;
-      }
-    }, {
-      key: "bufferedAmountLowThreshold",
-      get: function get() {
-        return this.dc.bufferedAmountLowThreshold;
-      },
-      set: function set(value) {
-        this.dc.bufferedAmountLowThreshold = value;
-      }
-    }, {
-      key: "binaryType",
-      get: function get() {
-        return this.dc.binaryType;
-      },
-      set: function set(value) {
-        this.dc.binaryType = value;
-      }
-    }, {
-      key: "onopen",
-      get: function get() {
-        return this.dc.onopen;
-      },
-      set: function set(value) {
-        this.dc.onopen = value;
-      }
-    }, {
-      key: "onbufferedamountlow",
-      get: function get() {
-        return this.dc.onbufferedamountlow;
-      },
-      set: function set(value) {
-        this.dc.onbufferedamountlow = value;
-      }
-    }, {
-      key: "onerror",
-      get: function get() {
-        return this.dc.onerror;
-      },
-      set: function set(value) {
-        this.dc.onerror = value;
-      }
-    }, {
-      key: "onclose",
-      get: function get() {
-        return this.dc.onclose;
-      },
-      set: function set(value) {
-        this.dc.onclose = value;
-      }
-    }, {
-      key: "onmessage",
-      get: function get() {
-        return this.dc.onmessage;
-      },
-      set: function set(value) {
-        this._onmessage = value;
+      key: "unbind",
+      value: function unbind() {
+        this.link.untie();
+        this.unchunker.onMessage = undefined;
       }
     }]);
 
-    return SecureDataChannel;
+    return SignalingTransport;
   }();
 
-  SecureDataChannel.CHUNK_COUNT_GC = 32;
-  SecureDataChannel.CHUNK_MAX_AGE = 60000;
+  var WebRTCTaskBuilder =
+  /*#__PURE__*/
+  function () {
+    function WebRTCTaskBuilder() {
+      _classCallCheck(this, WebRTCTaskBuilder);
+
+      this.version = 'v1';
+      this.logLevel = 'none';
+      this.handover = true;
+      this.maxChunkLength = 262144;
+    }
+
+    _createClass(WebRTCTaskBuilder, [{
+      key: "withLoggingLevel",
+      value: function withLoggingLevel(level) {
+        this.logLevel = level;
+        return this;
+      }
+    }, {
+      key: "withVersion",
+      value: function withVersion(version) {
+        this.version = version;
+        return this;
+      }
+    }, {
+      key: "withHandover",
+      value: function withHandover(on) {
+        this.handover = on;
+        return this;
+      }
+    }, {
+      key: "withMaxChunkLength",
+      value: function withMaxChunkLength(length) {
+        if (length <= chunkedDc.UNRELIABLE_UNORDERED_HEADER_LENGTH) {
+          throw new Error('Maximum chunk length must be greater than chunking overhead');
+        }
+
+        this.maxChunkLength = length;
+        return this;
+      }
+    }, {
+      key: "build",
+      value: function build() {
+        return new WebRTCTask(this.version, this.logLevel, this.handover, this.maxChunkLength);
+      }
+    }]);
+
+    return WebRTCTaskBuilder;
+  }();
 
   var WebRTCTask =
   /*#__PURE__*/
   function () {
-    function WebRTCTask() {
-      var handover = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
-      var maxPacketSize = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : WebRTCTask.DEFAULT_MAX_PACKET_SIZE;
-      var logLevel = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 'none';
-
+    function WebRTCTask(version, logLevel, handover, maxChunkLength) {
       _classCallCheck(this, WebRTCTask);
 
       this.logTag = '[SaltyRTC.WebRTC]';
       this.initialized = false;
       this.exclude = new Set();
-      this.doHandover = true;
-      this.sdc = null;
+      this.link = null;
+      this.transport = null;
       this.eventRegistry = new saltyrtcClient.EventRegistry();
       this.candidates = [];
       this.sendCandidatesTimeout = null;
+      this.version = version;
       this.log = new saltyrtcClient.Log(logLevel);
       this.doHandover = handover;
-      this.requestedMaxPacketSize = maxPacketSize;
+      this.maxChunkLength = maxChunkLength;
     }
 
     _createClass(WebRTCTask, [{
       key: "init",
       value: function init(signaling, data) {
         this.processExcludeList(data[WebRTCTask.FIELD_EXCLUDE]);
-        this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
         this.processHandover(data[WebRTCTask.FIELD_HANDOVER]);
+
+        if (this.version === 'v0') {
+          this.processMaxPacketSize(data[WebRTCTask.FIELD_MAX_PACKET_SIZE]);
+        }
+
         this.signaling = signaling;
         this.initialized = true;
       }
@@ -531,37 +493,16 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
           }
         }
 
-        for (var i = 0; i <= 65535; i++) {
+        for (var i = 0; i < 65535; i++) {
           if (!this.exclude.has(i)) {
-            this.sdcId = i;
+            this.channelId = i;
             break;
           }
         }
 
-        if (this.sdcId === undefined && this.doHandover === true) {
-          throw new Error('Exclude list is too big, no free data channel id can be found');
+        if (this.channelId === undefined && this.doHandover) {
+          throw new Error('No free data channel id can be found');
         }
-      }
-    }, {
-      key: "processMaxPacketSize",
-      value: function processMaxPacketSize(maxPacketSize) {
-        if (!Number.isInteger(maxPacketSize)) {
-          throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be an integer');
-        }
-
-        if (maxPacketSize < 0) {
-          throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
-        }
-
-        if (maxPacketSize === 0 && this.requestedMaxPacketSize === 0) {
-          this.negotiatedMaxPacketSize = 0;
-        } else if (maxPacketSize === 0 || this.requestedMaxPacketSize === 0) {
-          this.negotiatedMaxPacketSize = Math.max(maxPacketSize, this.requestedMaxPacketSize);
-        } else {
-          this.negotiatedMaxPacketSize = Math.min(maxPacketSize, this.requestedMaxPacketSize);
-        }
-
-        this.log.debug(this.logTag, 'Max packet size: We requested', this.requestedMaxPacketSize, 'bytes, peer requested', maxPacketSize, 'bytes. Using', this.negotiatedMaxPacketSize + '.');
       }
     }, {
       key: "processHandover",
@@ -569,6 +510,23 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
         if (handover === false) {
           this.doHandover = false;
         }
+      }
+    }, {
+      key: "processMaxPacketSize",
+      value: function processMaxPacketSize(remoteMaxPacketSize) {
+        var localMaxPacketSize = this.maxChunkLength;
+
+        if (!Number.isInteger(remoteMaxPacketSize)) {
+          throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be an integer');
+        }
+
+        if (remoteMaxPacketSize < 0) {
+          throw new RangeError(WebRTCTask.FIELD_MAX_PACKET_SIZE + ' field must be positive');
+        } else if (remoteMaxPacketSize > 0) {
+          this.maxChunkLength = Math.min(localMaxPacketSize, remoteMaxPacketSize);
+        }
+
+        this.log.debug(this.logTag, "Max packet size: Local requested ".concat(localMaxPacketSize) + " bytes, remote requested ".concat(remoteMaxPacketSize, " bytes. Using ").concat(this.maxChunkLength, "."));
       }
     }, {
       key: "onPeerHandshakeDone",
@@ -612,17 +570,22 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
             break;
 
           case 'handover':
-            if (this.doHandover === false) {
+            if (!this.doHandover) {
               this.log.error(this.logTag, 'Received unexpected handover message from peer');
               this.signaling.resetConnection(saltyrtcClient.CloseCode.ProtocolError);
               break;
             }
 
-            if (this.signaling.handoverState.local === false) {
-              this.sendHandover();
+            if (this.signaling.handoverState.peer) {
+              this.log.warn(this.logTag, 'Handover already received');
+              break;
             }
 
             this.signaling.handoverState.peer = true;
+
+            if (this.transport !== null) {
+              this.transport.flushMessageQueue();
+            }
 
             if (this.signaling.handoverState.both) {
               this.log.info(this.logTag, 'Handover to data channel finished');
@@ -723,19 +686,23 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
       key: "sendSignalingMessage",
       value: function sendSignalingMessage(payload) {
         if (this.signaling.getState() != 'task') {
-          throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, 'Could not send signaling message: Signaling state is not open.');
+          throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, "Could not send signaling message: Signaling state is not 'task'.");
         }
 
-        if (this.signaling.handoverState.local === false) {
-          throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, 'Could not send signaling message: Handover hasn\'t happened yet.');
+        if (!this.signaling.handoverState.local) {
+          throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, "Could not send signaling message: Handover hasn't happened yet.");
         }
 
-        this.sdc.send(payload);
+        if (this.transport === null) {
+          throw new saltyrtcClient.SignalingError(saltyrtcClient.CloseCode.ProtocolError, 'Could not send signaling message: Data channel is not established, yet.');
+        }
+
+        this.transport.send(payload);
       }
     }, {
       key: "getName",
       value: function getName() {
-        return WebRTCTask.PROTOCOL_NAME;
+        return "".concat(this.version, ".webrtc.tasks.saltyrtc.org");
       }
     }, {
       key: "getSupportedMessageTypes",
@@ -743,27 +710,17 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
         return ['offer', 'answer', 'candidates', 'handover'];
       }
     }, {
-      key: "getMaxPacketSize",
-      value: function getMaxPacketSize() {
-        if (this.initialized === true) {
-          return this.negotiatedMaxPacketSize;
-        }
-
-        return null;
-      }
-    }, {
       key: "getData",
       value: function getData() {
         var data = {};
         data[WebRTCTask.FIELD_EXCLUDE] = Array.from(this.exclude.values());
-        data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.requestedMaxPacketSize;
         data[WebRTCTask.FIELD_HANDOVER] = this.doHandover;
+
+        if (this.version === 'v0') {
+          data[WebRTCTask.FIELD_MAX_PACKET_SIZE] = this.maxChunkLength;
+        }
+
         return data;
-      }
-    }, {
-      key: "getSignaling",
-      value: function getSignaling() {
-        return this.signaling;
       }
     }, {
       key: "sendOffer",
@@ -841,66 +798,45 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
         };
 
         if (this.sendCandidatesTimeout === null) {
-          this.sendCandidatesTimeout = window.setTimeout(sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
+          this.sendCandidatesTimeout = self.setTimeout(sendFunc, WebRTCTask.CANDIDATE_BUFFERING_MS);
         }
       }
     }, {
-      key: "handover",
-      value: function handover(pc) {
-        var _this2 = this;
+      key: "getTransportLink",
+      value: function getTransportLink() {
+        this.log.debug(this.logTag, 'Create signalling transport link');
 
+        if (!this.doHandover) {
+          throw new Error('Handover has not been negotiated');
+        }
+
+        if (this.channelId === undefined) {
+          var error = 'Data channel id not set';
+          throw new Error(error);
+        }
+
+        if (this.link === null) {
+          this.link = new SignalingTransportLink(this.channelId, this.getName());
+        }
+
+        return this.link;
+      }
+    }, {
+      key: "handover",
+      value: function handover(handler) {
         this.log.debug(this.logTag, 'Initiate handover');
 
-        if (this.doHandover === false) {
-          this.log.error(this.logTag, 'Cannot do handover: Either us or our peer set handover=false');
-          return false;
+        if (!this.doHandover) {
+          throw new Error('Handover has not been negotiated');
         }
 
-        if (this.signaling.handoverState.any) {
-          this.log.error(this.logTag, 'Handover already in progress or finished');
-          return false;
+        if (this.signaling.handoverState.local || this.transport !== null) {
+          throw new Error('Handover already requested');
         }
 
-        if (this.sdcId === undefined || this.sdcId === null) {
-          this.log.error(this.logTag, 'Data channel id not set');
-          this.signaling.resetConnection(saltyrtcClient.CloseCode.InternalError);
-          throw new Error('Data channel id not set');
-        }
-
-        var dc = pc.createDataChannel(WebRTCTask.DC_LABEL, {
-          id: this.sdcId,
-          negotiated: true,
-          ordered: true,
-          protocol: WebRTCTask.PROTOCOL_NAME
-        });
-        dc.binaryType = 'arraybuffer';
-        this.sdc = new SecureDataChannel(dc, this);
-
-        this.sdc.onopen = function (ev) {
-          _this2.sendHandover();
-        };
-
-        this.sdc.onclose = function (ev) {
-          if (_this2.signaling.handoverState.any) {
-            _this2.signaling.setState('closed');
-          }
-        };
-
-        this.sdc.onerror = function (ev) {
-          _this2.log.error(_this2.logTag, 'Signaling data channel error:', ev);
-        };
-
-        this.sdc.onbufferedamountlow = function (ev) {
-          _this2.log.warn(_this2.logTag, 'Signaling data channel: Buffered amount low:', ev);
-        };
-
-        this.sdc.onmessage = function (ev) {
-          var decryptedData = new Uint8Array(ev.data);
-
-          _this2.signaling.onSignalingPeerMessage(decryptedData);
-        };
-
-        return true;
+        var crypto = this.createCryptoContext(this.channelId);
+        this.transport = new SignalingTransport(this.link, handler, this, this.signaling, crypto, this.log.level, this.maxChunkLength);
+        this.sendHandover();
       }
     }, {
       key: "sendHandover",
@@ -925,21 +861,20 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
         }
       }
     }, {
-      key: "wrapDataChannel",
-      value: function wrapDataChannel(dc) {
-        this.log.debug(this.logTag, "Wrapping data channel", dc.id);
-        return new SecureDataChannel(dc, this);
+      key: "createCryptoContext",
+      value: function createCryptoContext(channelId) {
+        return new DataChannelCryptoContext(channelId, this.signaling);
       }
     }, {
       key: "close",
       value: function close(reason) {
         this.log.debug(this.logTag, 'Closing signaling data channel:', saltyrtcClient.explainCloseCode(reason));
 
-        if (this.sdc !== null) {
-          this.sdc.close();
+        if (this.transport !== null) {
+          this.transport.close();
         }
 
-        this.sdc = null;
+        this.transport = null;
       }
     }, {
       key: "on",
@@ -949,18 +884,18 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
     }, {
       key: "once",
       value: function once(event, handler) {
-        var _this3 = this;
+        var _this2 = this;
 
         var onceHandler = function onceHandler(ev) {
           try {
             handler(ev);
           } catch (e) {
-            _this3.off(ev.type, onceHandler);
+            _this2.off(ev.type, onceHandler);
 
             throw e;
           }
 
-          _this3.off(ev.type, onceHandler);
+          _this2.off(ev.type, onceHandler);
         };
 
         this.eventRegistry.register(event, onceHandler);
@@ -1031,16 +966,14 @@ var saltyrtcTaskWebrtc = (function (exports,nacl) {
     return WebRTCTask;
   }();
 
-  WebRTCTask.PROTOCOL_NAME = 'v0.webrtc.tasks.saltyrtc.org';
-  WebRTCTask.DEFAULT_MAX_PACKET_SIZE = 16384;
   WebRTCTask.FIELD_EXCLUDE = 'exclude';
-  WebRTCTask.FIELD_MAX_PACKET_SIZE = 'max_packet_size';
   WebRTCTask.FIELD_HANDOVER = 'handover';
-  WebRTCTask.DC_LABEL = 'saltyrtc-signaling';
+  WebRTCTask.FIELD_MAX_PACKET_SIZE = 'max_packet_size';
   WebRTCTask.CANDIDATE_BUFFERING_MS = 5;
 
-  exports.WebRTCTask = WebRTCTask;
+  exports.DataChannelCryptoContext = DataChannelCryptoContext;
+  exports.WebRTCTaskBuilder = WebRTCTaskBuilder;
 
   return exports;
 
-}({},nacl));
+}({}));

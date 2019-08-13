@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.14.0 (2019-08-13)
+
+- [changed] Use interfaces for the data flow between the task and a WebRTC implementation (#28)
+
 ### v0.13.0 (2018-10-04)
 
 - [changed] Upgrade @saltyrtc/client to ^0.13.1
