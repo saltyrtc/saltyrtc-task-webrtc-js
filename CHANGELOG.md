@@ -12,6 +12,10 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.14.1 (2019-08-19)
+
+- [added] Expose version
+
 ### v0.14.0 (2019-08-13)
 
 - [changed] Use interfaces for the data flow between the task and a WebRTC implementation (#28)
