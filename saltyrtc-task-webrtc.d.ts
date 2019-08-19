@@ -134,6 +134,8 @@ declare namespace saltyrtc.tasks.webrtc {
     }
 
     interface WebRTCTask extends saltyrtc.Task {
+        readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
+
         sendOffer(offer: RTCSessionDescriptionInit): void;
         sendAnswer(answer: RTCSessionDescriptionInit): void;
         sendCandidate(candidate: Candidate): void;

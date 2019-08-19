@@ -107,7 +107,7 @@ export class WebRTCTask implements saltyrtc.tasks.webrtc.WebRTCTask {
     private static FIELD_MAX_PACKET_SIZE = 'max_packet_size'; // legacy v0
 
     // Protocol version
-    private readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
+    public readonly version: saltyrtc.tasks.webrtc.WebRTCTaskVersion;
 
     // Logging
     private readonly log: saltyrtc.Log;
