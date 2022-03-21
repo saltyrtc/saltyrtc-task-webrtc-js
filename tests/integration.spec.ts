@@ -37,10 +37,10 @@ export default () => {
             pair.responder.signaling.connect();
             return Promise.all([
                 new Promise((resolve) => {
-                    pair.initiator.signaling.once('state-change:' + state, () => resolve());
+                    pair.initiator.signaling.once('state-change:' + state, () => resolve(null));
                 }),
                 new Promise((resolve) => {
-                    pair.responder.signaling.once('state-change:' + state, () => resolve());
+                    pair.responder.signaling.once('state-change:' + state, () => resolve(null));
                 }),
             ]);
         }
@@ -124,7 +124,7 @@ export default () => {
                 // Receive answer
                 function receiveAnswer(): Promise<RTCSessionDescriptionInit> {
                     return new Promise((resolve) => {
-                        context.task.once('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
+                        context.task.once('answer', (e: saltyrtc.SaltyRTCEvent) => {
                             resolve(e.data);
                         });
                     });
@@ -142,7 +142,7 @@ export default () => {
                 // Receive offer
                 function receiveOffer(): Promise<RTCSessionDescriptionInit> {
                     return new Promise((resolve) => {
-                        context.task.once('offer', (offer: saltyrtc.tasks.webrtc.OfferEvent) => {
+                        context.task.once('offer', (offer: saltyrtc.SaltyRTCEvent) => {
                             resolve(offer.data);
                         });
                     });
@@ -178,10 +178,10 @@ export default () => {
                         context.task.sendCandidate(null);
                     }
                 };
-                context.pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
+                context.pc.onicecandidateerror = (e: Event) => {
                     console.error(logTag, 'ICE candidate error:', e);
                 };
-                context.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                context.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     for (let candidateInit of e.data) {
                         context.pc.addIceCandidate(candidateInit).catch((error) => {
                             console.error('Unable to add candidate:', candidateInit, error);
@@ -202,7 +202,7 @@ export default () => {
             function connect(context: PeerContext): Promise<void> {
                 return new Promise((resolve) => {
                     context.signaling.once('state-change:task', () => {
-                        resolve();
+                        resolve(null);
                     });
                     context.signaling.connect();
                 });
@@ -213,9 +213,9 @@ export default () => {
              */
             function allIceCandidatesReceived(context: PeerContext): Promise<void> {
                 return new Promise((resolve) => {
-                    context.task.on('candidates', (event: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                    context.task.on('candidates', (event: saltyrtc.SaltyRTCEvent) => {
                         if ((event.data as Array<RTCIceCandidateInit>).includes(null)) {
-                            resolve();
+                            resolve(null);
                         }
                     })
                 });
@@ -232,7 +232,7 @@ export default () => {
 
                 // noinspection JSUnusedGlobalSymbols
                 public get maxMessageSize(): number {
-                    return this.pc.sctp.maxMessageSize;
+                    return this.pc['sctp'].maxMessageSize;
                 }
 
                 public close(): void {
@@ -315,7 +315,7 @@ export default () => {
                     };
 
                     // Wait for handover to be finished
-                    context.signaling.once('handover', () => resolve());
+                    context.signaling.once('handover', () => resolve(null));
 
                     // Store instances on context
                     context.dc = dc;
@@ -388,7 +388,7 @@ export default () => {
 
             it('can send offers', async (done) => {
                 await connectBoth(pair, 'task');
-                pair.responder.task.on('offer', (e: saltyrtc.tasks.webrtc.OfferEvent) => {
+                pair.responder.task.on('offer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('offer');
                     expect(e.data.type).toEqual('offer');
                     expect(e.data.sdp).toEqual('YOLO');
@@ -399,7 +399,7 @@ export default () => {
 
             it('can send answers', async (done) => {
                 await connectBoth(pair, 'task');
-                pair.initiator.task.on('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
+                pair.initiator.task.on('answer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('answer');
                     expect(e.data.type).toEqual('answer');
                     expect(e.data.sdp).toEqual('YOLO');
@@ -417,7 +417,7 @@ export default () => {
                     null,
                 ];
 
-                pair.responder.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                pair.responder.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('candidates');
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
@@ -435,7 +435,7 @@ export default () => {
                     {'candidate': 'BAR', 'sdpMid': 'data', 'sdpMLineIndex': 1},
                 ];
 
-                pair.responder.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                pair.responder.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('candidates');
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
@@ -484,7 +484,7 @@ export default () => {
                     };
                     pair.initiator.link.receive = (message: Uint8Array) => {
                         expect(message).toEqual(Uint8Array.of(4, 5, 6));
-                        resolve();
+                        resolve(null);
                     };
                     pair.initiator.handler.send(Uint8Array.of(1, 2, 3));
                 });
@@ -497,7 +497,7 @@ export default () => {
                         const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
                             16 /* authenticator */ + 3 /* data */;
                         expect(array.byteLength).toEqual(expectedLength);
-                        resolve();
+                        resolve(null);
                     };
                     // @ts-ignore
                     pair.initiator.task.transport.send(Uint8Array.of(7, 6, 7));
@@ -516,7 +516,7 @@ export default () => {
                         // Expect unencrypted data
                         dc.onmessage = (event: MessageEvent) => {
                             expect(event.data).toEqual('bonjour');
-                            resolve();
+                            resolve(null);
                         };
                     };
                     const dc = pair.initiator.pc.createDataChannel('french-talk');
@@ -543,7 +543,7 @@ export default () => {
                                 new Uint8Array(event.data), DataChannelCryptoContext.NONCE_LENGTH);
                             const array = crypto.decrypt(box);
                             expect(array).toEqual(data);
-                            resolve();
+                            resolve(null);
                         };
                     };
 
@@ -572,7 +572,7 @@ export default () => {
                         // 'message' event fires after 'candidates'...
                         setTimeout(() => {
                             expect(receivedCount).toBe(1);
-                            resolve();
+                            resolve(null);
                         }, 1);
                     });
                     pair.initiator.task.sendCandidate({
@@ -597,7 +597,7 @@ export default () => {
                         setTimeout(() => {
                             expect(receivedCount).toBe(1);
                             expect(event.data).toEqual('Goedendag!');
-                            resolve();
+                            resolve(null);
                         }, 1);
                     });
                     pair.responder.signaling.sendApplicationMessage('Goedendag!')
@@ -743,7 +743,7 @@ export default () => {
                 private readonly highWaterMark: number;
                 private resolve: (value?: any | PromiseLike<any>) => void;
                 private paused: boolean = false;
-                private _ready: Promise<void> = Promise.resolve();
+                private _ready: Promise<void> = Promise.resolve(null);
 
                 public constructor(
                     role: string,
@@ -760,7 +760,7 @@ export default () => {
                             // console.debug(`${this.role} dc ${this.dc.id} resumed @ ` +
                             //     `${this.dc.bufferedAmount}`);
                             this.paused = false;
-                            this.resolve();
+                            this.resolve(null);
                         }
                     };
                 }
@@ -787,7 +787,7 @@ export default () => {
 
                 // Determine chunk length
                 // Note: We need to factor in the nonce of the encrypted chunk
-                const chunkLength = Math.min(pair.initiator.pc.sctp.maxMessageSize, 262144) -
+                const chunkLength = Math.min(pair.initiator.pc['sctp'].maxMessageSize, 262144) -
                     DataChannelCryptoContext.OVERHEAD_LENGTH;
                 console.debug(`Chunk length: ` +
                     `${chunkLength + DataChannelCryptoContext.OVERHEAD_LENGTH}`);
@@ -848,7 +848,7 @@ export default () => {
                         unchunker.onMessage = (message: Uint8Array) => {
                             expect(message.byteLength).toEqual(length);
                             console.info(`${length / 1024 / 1024} MiB message sending test done`);
-                            resolve();
+                            resolve(null);
                         };
                     });
                 });

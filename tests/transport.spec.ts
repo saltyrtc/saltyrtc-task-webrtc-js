@@ -73,14 +73,14 @@ export default () => {
                 Uint8Array.of(1, 0, 0, 0, 0, 0, 0, 0, 14, 5, 6),
             ];
 
-            let fakeSignaling: saltyrtc.Signaling;
-            let fakeTask: saltyrtc.tasks.webrtc.WebRTCTask;
+            let fakeSignaling: FakeSignaling;
+            let fakeTask: FakeTask;
             let context: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
 
             beforeEach(() => {
                 fakeSignaling = new FakeSignaling();
                 fakeTask = new FakeTask();
-                context = new DataChannelCryptoContext(ID, fakeSignaling);
+                context = new DataChannelCryptoContext(ID, fakeSignaling as any as saltyrtc.Signaling);
             });
 
             const createTransport = (
@@ -88,7 +88,14 @@ export default () => {
             ): [SignalingTransportLink, SignalingTransport] => {
                 const link = new SignalingTransportLink(ID, 'fake-protocol');
                 const transport = new SignalingTransport(
-                    link, handler, fakeTask, fakeSignaling, context, 'debug', 20);
+                    link,
+                    handler,
+                    fakeTask as unknown as saltyrtc.tasks.webrtc.WebRTCTask,
+                    fakeSignaling as any as saltyrtc.Signaling,
+                    context,
+                    'debug',
+                    20
+                );
                 fakeTask.transport = transport;
                 return [link, transport];
             };

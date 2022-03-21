@@ -36,7 +36,7 @@ export default () => {
             });
 
             describe('encrypt', function() {
-                let context: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
+                let context: DataChannelCryptoContext;
 
                 beforeEach(() => {
                     // @ts-ignore
@@ -53,7 +53,7 @@ export default () => {
                 });
 
                 it('uses expected cookie', () => {
-                    const cookie = context.cookiePair.ours.bytes;
+                    const cookie = context['cookiePair'].ours.bytes;
 
                     for (let i = 0; i < 10; ++i) {
                         const box = context.encrypt(new Uint8Array(0));
@@ -66,7 +66,7 @@ export default () => {
                     // Dirty little hack to copy the CSN
                     // Note: Will break with an API change in saltyrtc-client
                     const csn = new saltyrtcClient.CombinedSequence();
-                    (csn as any).sequenceNumber = context.csnPair.ours.sequenceNumber;
+                    (csn as any).sequenceNumber = context['csnPair'].ours['sequenceNumber'];
 
                     for (let i = 0; i < 10; ++i) {
                         const box = context.encrypt(new Uint8Array(0));
@@ -152,7 +152,7 @@ export default () => {
 
                 it('rejects invalid data channel id', () => {
                     const nonce = new DataChannelNonce(COOKIE, 1338, 0, 11);
-                    const box = { nonce: nonce.toUint8Array(), data: new Uint8Array(0) };
+                    const box: saltyrtc.Box = { nonce: nonce.toUint8Array(), data: new Uint8Array(0), length: 0 } as saltyrtc.Box;
                     const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('Data channel id in nonce does not match');
                 });
