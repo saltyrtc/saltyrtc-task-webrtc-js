@@ -77,6 +77,8 @@ export default () => {
         });
 
         describe('WebRTCTask', () => {
+            let pair: PeerContextPair;
+
             beforeEach(() => {
                 const initiatorTask = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
@@ -97,7 +99,7 @@ export default () => {
                     .initiatorInfo(initiator.permanentKeyBytes, initiator.authTokenBytes)
                     .usingTasks([responderTask])
                     .asResponder() as saltyrtc.SaltyRTC;
-                this.pair = {
+                pair = {
                     initiator: {
                         signaling: initiator,
                         task: initiatorTask,
@@ -385,7 +387,6 @@ export default () => {
             }
 
             it('can send offers', async (done) => {
-                const pair = this.pair as PeerContextPair;
                 await connectBoth(pair, 'task');
                 pair.responder.task.on('offer', (e: saltyrtc.tasks.webrtc.OfferEvent) => {
                     expect(e.type).toEqual('offer');
@@ -397,7 +398,6 @@ export default () => {
             });
 
             it('can send answers', async (done) => {
-                const pair = this.pair as PeerContextPair;
                 await connectBoth(pair, 'task');
                 pair.initiator.task.on('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
                     expect(e.type).toEqual('answer');
@@ -409,7 +409,6 @@ export default () => {
             });
 
             it('can send candidates', async (done) => {
-                const pair = this.pair as PeerContextPair;
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -429,7 +428,6 @@ export default () => {
             });
 
             it('can send buffered candidates', async (done) => {
-                const pair = this.pair as PeerContextPair;
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -449,7 +447,6 @@ export default () => {
             });
 
             it('ensure handover message not sent on data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair, false);
 
                 // Wait until all ICE candidates have been exchanged
@@ -475,7 +472,6 @@ export default () => {
             });
 
             it('can communicate on handover data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -509,7 +505,6 @@ export default () => {
             });
 
             it('can use a crypto context for a data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
 
                 // Use "raw" data channel
@@ -564,7 +559,6 @@ export default () => {
             });
 
             it('can send signaling message after handover', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -590,7 +584,6 @@ export default () => {
             });
 
             it('can send application message after handover', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -612,7 +605,6 @@ export default () => {
             });
 
             it('cannot do handover if disabled via constructor', async () => {
-                const pair = this.pair as PeerContextPair;
                 pair.responder.task = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
                     .withHandover(false)
@@ -635,8 +627,6 @@ export default () => {
             });
 
             it('is backwards compatible to legacy v0', async () => {
-                const pair = this.pair as PeerContextPair;
-
                 // Initiator: Offers only v0
                 pair.initiator.task = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
@@ -680,8 +670,6 @@ export default () => {
             });
 
             it('v1 is negotiated if both v1 and v0 are provided', async () => {
-                const pair = this.pair as PeerContextPair;
-
                 // Initiator: Offers v1 and v0 (in that order)
                 const initiatorMaxChunkLength = 1337;
                 pair.initiator.task = new WebRTCTaskBuilder()
@@ -867,7 +855,6 @@ export default () => {
             }
 
             it('can send arbitrary sized messages (serial)', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 await testDataChannel(pair, 1024);             // 1 KiB
                 await testDataChannel(pair, 1024 * 64);        // 64 KiB
@@ -879,7 +866,6 @@ export default () => {
             }, 120000);
 
             it('can send arbitrary sized messages (parallel)', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 await Promise.all([
                     testDataChannel(pair, 1024),             // 1 KiB

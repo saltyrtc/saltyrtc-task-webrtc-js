@@ -36,25 +36,27 @@ export default () => {
             });
 
             describe('encrypt', function() {
+                let context: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
+
                 beforeEach(() => {
                     // @ts-ignore
                     const fakeSignaling = new FakeSignaling() as saltyrtc.Signaling;
-                    this.context = new DataChannelCryptoContext(CHANNEL_ID, fakeSignaling);
+                    context = new DataChannelCryptoContext(CHANNEL_ID, fakeSignaling);
                 });
 
                 it('uses expected channel id', () => {
                     for (let i = 0; i < 10; ++i) {
-                        const box = this.context.encrypt(new Uint8Array(0));
+                        const box = context.encrypt(new Uint8Array(0));
                         const nonce = DataChannelNonce.fromUint8Array(box.nonce);
                         expect(nonce.channelId).toBe(CHANNEL_ID);
                     }
                 });
 
                 it('uses expected cookie', () => {
-                    const cookie = this.context.cookiePair.ours.bytes;
+                    const cookie = context.cookiePair.ours.bytes;
 
                     for (let i = 0; i < 10; ++i) {
-                        const box = this.context.encrypt(new Uint8Array(0));
+                        const box = context.encrypt(new Uint8Array(0));
                         const nonce = DataChannelNonce.fromUint8Array(box.nonce);
                         expect(nonce.cookie.bytes).toEqual(cookie);
                     }
@@ -64,10 +66,10 @@ export default () => {
                     // Dirty little hack to copy the CSN
                     // Note: Will break with an API change in saltyrtc-client
                     const csn = new saltyrtcClient.CombinedSequence();
-                    (csn as any).sequenceNumber = this.context.csnPair.ours.sequenceNumber;
+                    (csn as any).sequenceNumber = context.csnPair.ours.sequenceNumber;
 
                     for (let i = 0; i < 10; ++i) {
-                        const box = this.context.encrypt(new Uint8Array(0));
+                        const box = context.encrypt(new Uint8Array(0));
                         const nonce = DataChannelNonce.fromUint8Array(box.nonce);
                         const expectedCsn = csn.next();
                         expect(nonce.overflow).toBe(expectedCsn.overflow);
@@ -79,14 +81,14 @@ export default () => {
 
                 it('can encrypt Uint8Array', () => {
                     const data = new Uint8Array([1, 2, 3, 4]);
-                    const box = this.context.encrypt(data);
+                    const box = context.encrypt(data);
                     expect(box.data).toEqual(data);
                 });
 
                 it('can encrypt Uint8Array with offset', () => {
                     const buffer = new ArrayBuffer(12);
                     const data = new Uint8Array(buffer, 4, 4).fill(0x01);
-                    const box = this.context.encrypt(data);
+                    const box = context.encrypt(data);
                     expect(box.data.byteLength).toEqual(4);
                     expect(box.data).toEqual(data);
                 });
@@ -98,22 +100,24 @@ export default () => {
                 } as saltyrtc.Cookie;
                 const NONCE = new DataChannelNonce(COOKIE, CHANNEL_ID, 0, 11);
 
+                let context: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
+
                 beforeEach(() => {
                     // @ts-ignore
                     const fakeSignaling = new FakeSignaling() as saltyrtc.Signaling;
-                    this.context = new DataChannelCryptoContext(CHANNEL_ID, fakeSignaling);
+                    context = new DataChannelCryptoContext(CHANNEL_ID, fakeSignaling);
                 });
 
                 it('rejects invalid nonce size', () => {
                     const box = { nonce: new Uint8Array(11) } as saltyrtc.Box;
-                    const decrypt = () => this.context.decrypt(box);
+                    const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('Unable to create nonce, reason: ' +
                         'ValidationError: Bad packet length');
                 });
 
                 it('rejects cookie if local and remote cookie are identical', () => {
-                    const box = this.context.encrypt(new Uint8Array(0));
-                    const decrypt = () => this.context.decrypt(box);
+                    const box = context.encrypt(new Uint8Array(0));
+                    const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('Local and remote cookie are equal');
                 });
 
@@ -123,13 +127,13 @@ export default () => {
                     } as saltyrtc.Box;
 
                     // Applies remote cookie
-                    this.context.decrypt(box);
+                    context.decrypt(box);
 
                     // Verifies remote cookie
                     const cookie = { bytes: new Uint8Array(16) } as saltyrtc.Cookie;
                     (box as any).nonce =
                         new DataChannelNonce(cookie, CHANNEL_ID, 0, 12).toUint8Array();
-                    const decrypt = () => this.context.decrypt(box);
+                    const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('Remote cookie changed');
                 });
 
@@ -139,24 +143,24 @@ export default () => {
                     } as saltyrtc.Box;
 
                     // Applies remote CSN
-                    this.context.decrypt(box);
+                    context.decrypt(box);
 
                     // Verifies remote CSN
-                    const decrypt = () => this.context.decrypt(box);
+                    const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('CSN reuse detected');
                 });
 
                 it('rejects invalid data channel id', () => {
                     const nonce = new DataChannelNonce(COOKIE, 1338, 0, 11);
                     const box = { nonce: nonce.toUint8Array(), data: new Uint8Array(0) };
-                    const decrypt = () => this.context.decrypt(box);
+                    const decrypt = () => context.decrypt(box);
                     expect(decrypt).toThrowError('Data channel id in nonce does not match');
                 });
 
                 it('can decrypt Uint8Array', () => {
                     const data = new Uint8Array([1, 2, 3, 4]);
                     const box = { nonce: NONCE.toUint8Array(), data: data } as saltyrtc.Box;
-                    expect(this.context.decrypt(box)).toEqual(data);
+                    expect(context.decrypt(box)).toEqual(data);
                 });
             });
         });

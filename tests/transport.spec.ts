@@ -73,12 +73,14 @@ export default () => {
                 Uint8Array.of(1, 0, 0, 0, 0, 0, 0, 0, 14, 5, 6),
             ];
 
+            let fakeSignaling: saltyrtc.Signaling;
+            let fakeTask: saltyrtc.tasks.webrtc.WebRTCTask;
+            let context: saltyrtc.tasks.webrtc.DataChannelCryptoContext;
+
             beforeEach(() => {
-                // @ts-ignore
-                this.fakeSignaling = new FakeSignaling() as saltyrtc.Signaling;
-                // @ts-ignore
-                this.fakeTask = new FakeTask() as saltyrtc.tasks.webrtc.WebRTCTask;
-                this.context = new DataChannelCryptoContext(ID, this.fakeSignaling);
+                fakeSignaling = new FakeSignaling();
+                fakeTask = new FakeTask();
+                context = new DataChannelCryptoContext(ID, fakeSignaling);
             });
 
             const createTransport = (
@@ -86,8 +88,8 @@ export default () => {
             ): [SignalingTransportLink, SignalingTransport] => {
                 const link = new SignalingTransportLink(ID, 'fake-protocol');
                 const transport = new SignalingTransport(
-                    link, handler, this.fakeTask, this.fakeSignaling, this.context, 'debug', 20);
-                this.fakeTask.transport = transport;
+                    link, handler, fakeTask, fakeSignaling, context, 'debug', 20);
+                fakeTask.transport = transport;
                 return [link, transport];
             };
 
@@ -97,11 +99,11 @@ export default () => {
                 const [link, _] = createTransport(handler);
 
                 // Before closed
-                expect(this.fakeSignaling.state).toBe('task');
+                expect(fakeSignaling.state).toBe('task');
 
                 // Close
                 link.closed();
-                expect(this.fakeSignaling.state).toBe('closed');
+                expect(fakeSignaling.state).toBe('closed');
             });
 
             it('sends a message encrypted and in chunks', () => {
@@ -129,7 +131,7 @@ export default () => {
                 const [link, _] = createTransport(handler);
 
                 // Before nonce and chunks
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
 
                 // Add fake nonce
                 for (let i = 0; i < 8; ++i) {
@@ -145,16 +147,16 @@ export default () => {
                 link.receive(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 42));
 
                 // Add first two chunks
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
                 link.receive(CHUNKS[0]);
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
                 link.receive(CHUNKS[1]);
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
 
                 // Add last chunk
                 link.receive(CHUNKS[2]);
-                expect(this.fakeSignaling.messages.length).toBe(1);
-                expect(this.fakeSignaling.messages[0]).toEqual(MESSAGE);
+                expect(fakeSignaling.messages.length).toBe(1);
+                expect(fakeSignaling.messages[0]).toEqual(MESSAGE);
             });
 
             it('closes on error correctly', () => {
@@ -176,19 +178,19 @@ export default () => {
                     'receive: Not tied to a SignalingTransport');
 
                 // Ensure closed
-                expect(this.fakeTask.closed).toBeTruthy();
+                expect(fakeTask.closed).toBeTruthy();
             });
 
             it('queues messages until handover requested by remote', () => {
                 const handler = {
                     maxMessageSize: MAX_MESSAGE_SIZE,
                 } as saltyrtc.tasks.webrtc.SignalingTransportHandler;
-                this.fakeSignaling.handoverState.peer = false;
+                fakeSignaling.handoverState.peer = false;
                 // noinspection JSUnusedLocalSymbols
                 const [link, transport] = createTransport(handler);
 
                 // Before nonce and chunks
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
 
                 // Add fake nonce
                 for (let i = 0; i < 8; ++i) {
@@ -208,21 +210,21 @@ export default () => {
                 }
 
                 // Expect messages to be queued
-                expect(this.fakeSignaling.messages.length).toBe(0);
+                expect(fakeSignaling.messages.length).toBe(0);
                 // @ts-ignore
                 expect(transport.messageQueue[0]).toEqual(MESSAGE);
 
                 // Flush queue
                 expect(() => transport.flushMessageQueue()).toThrowError(
                     'Remote did not request handover');
-                this.fakeSignaling.handoverState.peer = true;
+                fakeSignaling.handoverState.peer = true;
                 transport.flushMessageQueue();
 
                 // Expect messages to be processed now
                 // @ts-ignore
                 expect(transport.messageQueue).toBe(null);
-                expect(this.fakeSignaling.messages.length).toBe(1);
-                expect(this.fakeSignaling.messages[0]).toEqual(MESSAGE);
+                expect(fakeSignaling.messages.length).toBe(1);
+                expect(fakeSignaling.messages[0]).toEqual(MESSAGE);
             });
         });
     });

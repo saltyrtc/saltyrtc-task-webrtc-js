@@ -46,7 +46,7 @@
     "@babel/polyfill": "^7.0.0-rc.2",
     "@babel/preset-env": "^7.0.0-rc.2",
     "@saltyrtc/client": "^0.14.3",
-    "jasmine-core": "^3.2",
+    "jasmine-core": "3.99",
     "karma": "^3.0.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-firefox-launcher": "^1.1.0",
