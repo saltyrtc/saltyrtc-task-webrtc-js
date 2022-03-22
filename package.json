@@ -54,7 +54,7 @@
     "rollup": "^2.70.1",
     "rollup-plugin-babel": "^4.0.0-beta.8",
     "rollup-plugin-typescript": "^0.8.1",
-    "rollup-plugin-uglify": "^4.0.0",
+    "rollup-plugin-terser": "^7.0.2",
     "tweetnacl": "^1.0.0",
     "typescript": "^4",
     "webrtc-adapter": "^8"
