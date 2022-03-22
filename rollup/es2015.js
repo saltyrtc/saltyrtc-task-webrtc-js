@@ -14,7 +14,7 @@ export default {
     output: {
         file: 'dist/saltyrtc-task-webrtc.es2015.js',
         format: 'es',
-        sourceMap: true,
+        sourcemap: true,
         banner: "/**\n" +
                 " * saltyrtc-task-webrtc v" + p.version + "\n" +
                 " * " + p.description + "\n" +

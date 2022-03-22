@@ -51,7 +51,7 @@
     "karma-firefox-launcher": "^2.1.2",
     "karma-jasmine": "^4.0.1",
     "msgpack-lite": "^0.1.26",
-    "rollup": "^0.64",
+    "rollup": "^2.70.1",
     "rollup-plugin-babel": "^4.0.0-beta.8",
     "rollup-plugin-typescript": "^0.8.1",
     "rollup-plugin-uglify": "^4.0.0",
