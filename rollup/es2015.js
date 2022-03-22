@@ -14,13 +14,13 @@ export default {
     output: {
         file: 'dist/saltyrtc-task-webrtc.es2015.js',
         format: 'es',
-        sourceMap: true,
+        sourcemap: true,
         banner: "/**\n" +
                 " * saltyrtc-task-webrtc v" + p.version + "\n" +
                 " * " + p.description + "\n" +
                 " * " + p.homepage + "\n" +
                 " *\n" +
-                " * Copyright (C) 2016-2019 " + p.author + "\n" +
+                " * Copyright (C) 2016-2022 " + p.author + "\n" +
                 " *\n" +
                 " * This software may be modified and distributed under the terms\n" +
                 " * of the MIT license:\n" +
