@@ -786,8 +786,14 @@ export default () => {
                 message.fill(0xde);
 
                 // Determine chunk length
+                //
                 // Note: We need to factor in the nonce of the encrypted chunk
-                const chunkLength = Math.min(pair.initiator.pc['sctp'].maxMessageSize, 262144) -
+                //
+                // Note 2: Original message size of 262144 disabled until the
+                //         following bugs are fixed:
+                //         https://bugs.chromium.org/p/chromium/issues/detail?id=1309034
+                //         https://bugzilla.mozilla.org/show_bug.cgi?id=1760769
+                let chunkLength = Math.min(pair.initiator.pc['sctp'].maxMessageSize, /* 262144 */ 65536) -
                     DataChannelCryptoContext.OVERHEAD_LENGTH;
                 console.debug(`Chunk length: ` +
                     `${chunkLength + DataChannelCryptoContext.OVERHEAD_LENGTH}`);
