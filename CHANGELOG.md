@@ -12,6 +12,12 @@ Possible log types:
 - `[security]` to invite users to upgrade in case of vulnerabilities.
 
 
+### v0.15.0 (2022-03-22)
+
+- [changed] Upgrade npm dependencies (#42)
+- [changed] Upgrade @saltyrtc/client to ^0.15.1 (#42)
+- [removed] Release does not contain a polyfilled ES5 bundle anymore (#42)
+
 ### v0.14.1 (2019-08-19)
 
 - [added] Expose version
