@@ -11,6 +11,7 @@ import {WebRTCTaskBuilder} from "../src/main";
 import {Config} from "./config";
 import {DummyTask} from "./testtasks";
 import {DataChannelCryptoContext} from "../src/crypto";
+import {Future} from "./future";
 
 type PeerContext = {
     signaling: saltyrtc.SaltyRTC,
@@ -386,29 +387,34 @@ export default () => {
                 }
             }
 
-            it('can send offers', async (done) => {
+            it('can send offers', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
                 pair.responder.task.on('offer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('offer');
                     expect(e.data.type).toEqual('offer');
                     expect(e.data.sdp).toEqual('YOLO');
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendOffer({'type': 'offer', 'sdp': 'YOLO'});
+                await done;
             });
 
-            it('can send answers', async (done) => {
+            it('can send answers', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
                 pair.initiator.task.on('answer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('answer');
                     expect(e.data.type).toEqual('answer');
                     expect(e.data.sdp).toEqual('YOLO');
-                    done();
+                    done.resolve(null);
                 });
                 pair.responder.task.sendAnswer({'type': 'answer', 'sdp': 'YOLO'});
+                await done;
             });
 
-            it('can send candidates', async (done) => {
+            it('can send candidates', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -422,12 +428,14 @@ export default () => {
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
                     expect(e.data).toEqual(candidates);
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendCandidates(candidates);
+                await done;
             });
 
-            it('can send buffered candidates', async (done) => {
+            it('can send buffered candidates', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -440,10 +448,11 @@ export default () => {
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
                     expect(e.data).toEqual(candidates);
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendCandidate(candidates[0]);
                 pair.initiator.task.sendCandidate(candidates[1]);
+                await done;
             });
 
             it('ensure handover message not sent on data channel', async () => {
