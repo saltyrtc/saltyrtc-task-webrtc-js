@@ -57,7 +57,7 @@
     "rollup-plugin-uglify": "^4.0.0",
     "tweetnacl": "^1.0.0",
     "typescript": "^4",
-    "webrtc-adapter": "^7.2.1"
+    "webrtc-adapter": "^8"
   },
   "files": [
     "dist",
