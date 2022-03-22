@@ -8,10 +8,9 @@
   "types": "saltyrtc-task-webrtc.d.ts",
   "scripts": {
     "test": "karma start --single-run --log-level=debug --colors",
-    "dist": "npm run dist_es2015 && npm run dist_es5 && npm run dist_es5_min && npm run dist_es5_min_polyfill",
+    "dist": "npm run dist_es2015 && npm run dist_es5 && npm run dist_es5_min",
     "dist_es5": "rollup -c rollup/es5.js",
     "dist_es5_min": "rollup -c rollup/es5.min.js",
-    "dist_es5_min_polyfill": "rollup -c rollup/es5.min.polyfill.js",
     "dist_es2015": "rollup -c rollup/es2015.js",
     "rollup_tests": "rollup -c rollup/testing.js",
     "validate": "tsc --noEmit"
@@ -38,27 +37,27 @@
     "@saltyrtc/chunked-dc": "^2.0.1"
   },
   "peerDependencies": {
-    "@saltyrtc/client": "^0.14.3",
+    "@saltyrtc/client": "^0.15.1",
     "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0-rc.2",
     "@babel/polyfill": "^7.0.0-rc.2",
     "@babel/preset-env": "^7.0.0-rc.2",
-    "@saltyrtc/client": "^0.14.3",
-    "jasmine-core": "^3.2",
-    "karma": "^3.0.0",
-    "karma-chrome-launcher": "^2.2.0",
-    "karma-firefox-launcher": "^1.1.0",
-    "karma-jasmine": "^1.1.2",
+    "@saltyrtc/client": "^0.15.1",
+    "jasmine-core": "^4",
+    "karma": "^6.3.17",
+    "karma-chrome-launcher": "^3.1.1",
+    "karma-firefox-launcher": "^2.1.2",
+    "karma-jasmine": "^4.0.1",
     "msgpack-lite": "^0.1.26",
-    "rollup": "^0.64",
+    "rollup": "^2.70.1",
     "rollup-plugin-babel": "^4.0.0-beta.8",
-    "rollup-plugin-typescript": "^0.8.1",
-    "rollup-plugin-uglify": "^4.0.0",
+    "rollup-plugin-typescript": "^1.0.1",
+    "rollup-plugin-terser": "^7.0.2",
     "tweetnacl": "^1.0.0",
-    "typescript": "^3.1",
-    "webrtc-adapter": "^7.2.1"
+    "typescript": "^4",
+    "webrtc-adapter": "^8"
   },
   "files": [
     "dist",

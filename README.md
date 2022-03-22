@@ -10,8 +10,12 @@
 This is a [SaltyRTC](https://saltyrtc.org/) WebRTC task version 1
 implementation for JavaScript (ES5 / ES2015), written in TypeScript.
 
-**Warning: This is beta software. Use at your own risk. Testing and review is
-welcome!**
+> :warning: **Note:** The SaltyRTC client libraries are in maintenance mode.
+> They will still receive bugfixes and regular maintenance, but if you want to
+> start using these libraries, be prepared that you will need to take over
+> maintenance at some point in time. (If you are interested in maintaining the
+> libraries, please let us know, our e-mails are in the README, section
+> "Security".)
 
 ## Installing
 
@@ -184,6 +188,9 @@ You can import this file into your browser certificate store. For Chrome/Chromiu
 ```bash
 certutil -d sql:$HOME/.pki/nssdb -A -t "P,," -n saltyrtc-test-ca -i saltyrtc.crt
 ```
+
+Additionally, you need to open `chrome://flags/#allow-insecure-localhost` and
+enable it.
 
 In Firefox the easiest way to add your certificate to the browser is to start
 the SaltyRTC server (e.g. on `localhost` port 8765), then to visit the

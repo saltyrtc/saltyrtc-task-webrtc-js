@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2019 Threema GmbH
+ * Copyright (C) 2016-2022 Threema GmbH
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the `LICENSE.md` file for details.
@@ -11,6 +11,7 @@ import {WebRTCTaskBuilder} from "../src/main";
 import {Config} from "./config";
 import {DummyTask} from "./testtasks";
 import {DataChannelCryptoContext} from "../src/crypto";
+import {Future} from "./future";
 
 type PeerContext = {
     signaling: saltyrtc.SaltyRTC,
@@ -37,10 +38,10 @@ export default () => {
             pair.responder.signaling.connect();
             return Promise.all([
                 new Promise((resolve) => {
-                    pair.initiator.signaling.once('state-change:' + state, () => resolve());
+                    pair.initiator.signaling.once('state-change:' + state, () => resolve(null));
                 }),
                 new Promise((resolve) => {
-                    pair.responder.signaling.once('state-change:' + state, () => resolve());
+                    pair.responder.signaling.once('state-change:' + state, () => resolve(null));
                 }),
             ]);
         }
@@ -77,6 +78,8 @@ export default () => {
         });
 
         describe('WebRTCTask', () => {
+            let pair: PeerContextPair;
+
             beforeEach(() => {
                 const initiatorTask = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
@@ -97,7 +100,7 @@ export default () => {
                     .initiatorInfo(initiator.permanentKeyBytes, initiator.authTokenBytes)
                     .usingTasks([responderTask])
                     .asResponder() as saltyrtc.SaltyRTC;
-                this.pair = {
+                pair = {
                     initiator: {
                         signaling: initiator,
                         task: initiatorTask,
@@ -122,7 +125,7 @@ export default () => {
                 // Receive answer
                 function receiveAnswer(): Promise<RTCSessionDescriptionInit> {
                     return new Promise((resolve) => {
-                        context.task.once('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
+                        context.task.once('answer', (e: saltyrtc.SaltyRTCEvent) => {
                             resolve(e.data);
                         });
                     });
@@ -140,7 +143,7 @@ export default () => {
                 // Receive offer
                 function receiveOffer(): Promise<RTCSessionDescriptionInit> {
                     return new Promise((resolve) => {
-                        context.task.once('offer', (offer: saltyrtc.tasks.webrtc.OfferEvent) => {
+                        context.task.once('offer', (offer: saltyrtc.SaltyRTCEvent) => {
                             resolve(offer.data);
                         });
                     });
@@ -176,10 +179,10 @@ export default () => {
                         context.task.sendCandidate(null);
                     }
                 };
-                context.pc.onicecandidateerror = (e: RTCPeerConnectionIceErrorEvent) => {
+                context.pc.onicecandidateerror = (e: Event) => {
                     console.error(logTag, 'ICE candidate error:', e);
                 };
-                context.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                context.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     for (let candidateInit of e.data) {
                         context.pc.addIceCandidate(candidateInit).catch((error) => {
                             console.error('Unable to add candidate:', candidateInit, error);
@@ -200,7 +203,7 @@ export default () => {
             function connect(context: PeerContext): Promise<void> {
                 return new Promise((resolve) => {
                     context.signaling.once('state-change:task', () => {
-                        resolve();
+                        resolve(null);
                     });
                     context.signaling.connect();
                 });
@@ -211,9 +214,9 @@ export default () => {
              */
             function allIceCandidatesReceived(context: PeerContext): Promise<void> {
                 return new Promise((resolve) => {
-                    context.task.on('candidates', (event: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                    context.task.on('candidates', (event: saltyrtc.SaltyRTCEvent) => {
                         if ((event.data as Array<RTCIceCandidateInit>).includes(null)) {
-                            resolve();
+                            resolve(null);
                         }
                     })
                 });
@@ -230,7 +233,7 @@ export default () => {
 
                 // noinspection JSUnusedGlobalSymbols
                 public get maxMessageSize(): number {
-                    return this.pc.sctp.maxMessageSize;
+                    return this.pc['sctp'].maxMessageSize;
                 }
 
                 public close(): void {
@@ -313,7 +316,7 @@ export default () => {
                     };
 
                     // Wait for handover to be finished
-                    context.signaling.once('handover', () => resolve());
+                    context.signaling.once('handover', () => resolve(null));
 
                     // Store instances on context
                     context.dc = dc;
@@ -384,32 +387,34 @@ export default () => {
                 }
             }
 
-            it('can send offers', async (done) => {
-                const pair = this.pair as PeerContextPair;
+            it('can send offers', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
-                pair.responder.task.on('offer', (e: saltyrtc.tasks.webrtc.OfferEvent) => {
+                pair.responder.task.on('offer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('offer');
                     expect(e.data.type).toEqual('offer');
                     expect(e.data.sdp).toEqual('YOLO');
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendOffer({'type': 'offer', 'sdp': 'YOLO'});
+                await done;
             });
 
-            it('can send answers', async (done) => {
-                const pair = this.pair as PeerContextPair;
+            it('can send answers', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
-                pair.initiator.task.on('answer', (e: saltyrtc.tasks.webrtc.AnswerEvent) => {
+                pair.initiator.task.on('answer', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('answer');
                     expect(e.data.type).toEqual('answer');
                     expect(e.data.sdp).toEqual('YOLO');
-                    done();
+                    done.resolve(null);
                 });
                 pair.responder.task.sendAnswer({'type': 'answer', 'sdp': 'YOLO'});
+                await done;
             });
 
-            it('can send candidates', async (done) => {
-                const pair = this.pair as PeerContextPair;
+            it('can send candidates', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -418,18 +423,19 @@ export default () => {
                     null,
                 ];
 
-                pair.responder.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                pair.responder.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('candidates');
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
                     expect(e.data).toEqual(candidates);
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendCandidates(candidates);
+                await done;
             });
 
-            it('can send buffered candidates', async (done) => {
-                const pair = this.pair as PeerContextPair;
+            it('can send buffered candidates', async () => {
+                const done = new Future();
                 await connectBoth(pair, 'task');
 
                 const candidates: Array<RTCIceCandidateInit> = [
@@ -437,19 +443,19 @@ export default () => {
                     {'candidate': 'BAR', 'sdpMid': 'data', 'sdpMLineIndex': 1},
                 ];
 
-                pair.responder.task.on('candidates', (e: saltyrtc.tasks.webrtc.CandidatesEvent) => {
+                pair.responder.task.on('candidates', (e: saltyrtc.SaltyRTCEvent) => {
                     expect(e.type).toEqual('candidates');
                     expect(Array.isArray(e.data)).toEqual(true);
                     expect(e.data.length).toEqual(candidates.length);
                     expect(e.data).toEqual(candidates);
-                    done();
+                    done.resolve(null);
                 });
                 pair.initiator.task.sendCandidate(candidates[0]);
                 pair.initiator.task.sendCandidate(candidates[1]);
+                await done;
             });
 
             it('ensure handover message not sent on data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair, false);
 
                 // Wait until all ICE candidates have been exchanged
@@ -475,7 +481,6 @@ export default () => {
             });
 
             it('can communicate on handover data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -488,7 +493,7 @@ export default () => {
                     };
                     pair.initiator.link.receive = (message: Uint8Array) => {
                         expect(message).toEqual(Uint8Array.of(4, 5, 6));
-                        resolve();
+                        resolve(null);
                     };
                     pair.initiator.handler.send(Uint8Array.of(1, 2, 3));
                 });
@@ -501,7 +506,7 @@ export default () => {
                         const expectedLength = 24 /* nonce */ + 9 /* chunking */ +
                             16 /* authenticator */ + 3 /* data */;
                         expect(array.byteLength).toEqual(expectedLength);
-                        resolve();
+                        resolve(null);
                     };
                     // @ts-ignore
                     pair.initiator.task.transport.send(Uint8Array.of(7, 6, 7));
@@ -509,7 +514,6 @@ export default () => {
             });
 
             it('can use a crypto context for a data channel', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
 
                 // Use "raw" data channel
@@ -521,7 +525,7 @@ export default () => {
                         // Expect unencrypted data
                         dc.onmessage = (event: MessageEvent) => {
                             expect(event.data).toEqual('bonjour');
-                            resolve();
+                            resolve(null);
                         };
                     };
                     const dc = pair.initiator.pc.createDataChannel('french-talk');
@@ -548,7 +552,7 @@ export default () => {
                                 new Uint8Array(event.data), DataChannelCryptoContext.NONCE_LENGTH);
                             const array = crypto.decrypt(box);
                             expect(array).toEqual(data);
-                            resolve();
+                            resolve(null);
                         };
                     };
 
@@ -564,7 +568,6 @@ export default () => {
             });
 
             it('can send signaling message after handover', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -578,7 +581,7 @@ export default () => {
                         // 'message' event fires after 'candidates'...
                         setTimeout(() => {
                             expect(receivedCount).toBe(1);
-                            resolve();
+                            resolve(null);
                         }, 1);
                     });
                     pair.initiator.task.sendCandidate({
@@ -590,7 +593,6 @@ export default () => {
             });
 
             it('can send application message after handover', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 expect(pair.initiator.dc.readyState).toEqual('open');
                 expect(pair.responder.dc.readyState).toEqual('open');
@@ -604,7 +606,7 @@ export default () => {
                         setTimeout(() => {
                             expect(receivedCount).toBe(1);
                             expect(event.data).toEqual('Goedendag!');
-                            resolve();
+                            resolve(null);
                         }, 1);
                     });
                     pair.responder.signaling.sendApplicationMessage('Goedendag!')
@@ -612,7 +614,6 @@ export default () => {
             });
 
             it('cannot do handover if disabled via constructor', async () => {
-                const pair = this.pair as PeerContextPair;
                 pair.responder.task = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
                     .withHandover(false)
@@ -635,8 +636,6 @@ export default () => {
             });
 
             it('is backwards compatible to legacy v0', async () => {
-                const pair = this.pair as PeerContextPair;
-
                 // Initiator: Offers only v0
                 pair.initiator.task = new WebRTCTaskBuilder()
                     .withLoggingLevel(LOG_LEVEL)
@@ -680,8 +679,6 @@ export default () => {
             });
 
             it('v1 is negotiated if both v1 and v0 are provided', async () => {
-                const pair = this.pair as PeerContextPair;
-
                 // Initiator: Offers v1 and v0 (in that order)
                 const initiatorMaxChunkLength = 1337;
                 pair.initiator.task = new WebRTCTaskBuilder()
@@ -755,7 +752,7 @@ export default () => {
                 private readonly highWaterMark: number;
                 private resolve: (value?: any | PromiseLike<any>) => void;
                 private paused: boolean = false;
-                private _ready: Promise<void> = Promise.resolve();
+                private _ready: Promise<void> = Promise.resolve(null);
 
                 public constructor(
                     role: string,
@@ -772,7 +769,7 @@ export default () => {
                             // console.debug(`${this.role} dc ${this.dc.id} resumed @ ` +
                             //     `${this.dc.bufferedAmount}`);
                             this.paused = false;
-                            this.resolve();
+                            this.resolve(null);
                         }
                     };
                 }
@@ -798,8 +795,14 @@ export default () => {
                 message.fill(0xde);
 
                 // Determine chunk length
+                //
                 // Note: We need to factor in the nonce of the encrypted chunk
-                const chunkLength = Math.min(pair.initiator.pc.sctp.maxMessageSize, 262144) -
+                //
+                // Note 2: Original message size of 262144 disabled until the
+                //         following bugs are fixed:
+                //         https://bugs.chromium.org/p/chromium/issues/detail?id=1309034
+                //         https://bugzilla.mozilla.org/show_bug.cgi?id=1760769
+                let chunkLength = Math.min(pair.initiator.pc['sctp'].maxMessageSize, /* 262144 */ 65536) -
                     DataChannelCryptoContext.OVERHEAD_LENGTH;
                 console.debug(`Chunk length: ` +
                     `${chunkLength + DataChannelCryptoContext.OVERHEAD_LENGTH}`);
@@ -860,14 +863,13 @@ export default () => {
                         unchunker.onMessage = (message: Uint8Array) => {
                             expect(message.byteLength).toEqual(length);
                             console.info(`${length / 1024 / 1024} MiB message sending test done`);
-                            resolve();
+                            resolve(null);
                         };
                     });
                 });
             }
 
             it('can send arbitrary sized messages (serial)', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 await testDataChannel(pair, 1024);             // 1 KiB
                 await testDataChannel(pair, 1024 * 64);        // 64 KiB
@@ -879,7 +881,6 @@ export default () => {
             }, 120000);
 
             it('can send arbitrary sized messages (parallel)', async () => {
-                const pair = this.pair as PeerContextPair;
                 await setupPeerConnection(pair);
                 await Promise.all([
                     testDataChannel(pair, 1024),             // 1 KiB
