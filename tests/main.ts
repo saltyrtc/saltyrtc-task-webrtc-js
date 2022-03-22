@@ -7,8 +7,6 @@
 
 /// <reference path="jasmine.d.ts" />
 
-import "../node_modules/@babel/polyfill/dist/polyfill"; // Include ES5 polyfills
-
 import test_nonce from "./nonce.spec";
 import test_crypto from "./crypto.spec";
 import test_transport from "./transport.spec";
